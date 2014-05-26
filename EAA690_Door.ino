@@ -21,9 +21,9 @@ int RED = 5;
 WiFiClient client;
 boolean wifiEnabled = true;
 boolean sdEnabled = true;
-char ssid[] = "bmichael"; // EAA690 your network SSID (name) // EAA690
-boolean passRequired = true;
-char pass[] = "4047355660";  // your network password (use for WPA, or use as key for WEP)
+char ssid[] = "EAA690"; // EAA690 your network SSID (name) // EAA690
+boolean passRequired = false;
+char pass[] = "PASSWORD";  // your network password (use for WPA, or use as key for WEP)
 int keyIndex = 0;            // your network key Index number (needed only for WEP)
 unsigned long lastCheck = 0;
 unsigned long epoch = 0;
@@ -88,8 +88,15 @@ void setup() {
 }
 
 void loop() {
+  Serial.println("Begin loop");
   String tagString = readTag();
-
+  unsigned long nowLong = now();
+  //Serial.print("time=");
+  //Serial.println(nowLong % 60);
+  // Get the data once per hour, at the top of the hour
+  if ((nowLong % 86400) / 3600 == 0) {
+    getUserData();
+  }
   if (tagString == "") {
     String timeStr = getTimeAsString();
     String msg = "Waiting...      " + timeStr;
@@ -97,7 +104,6 @@ void loop() {
     displayLCD(msg, 1, false);
     delay(2000);
   } else {
-    getUserData(tagString);
     if (checkTag(tagString)) { //Check if it is a match
       openDoor(tagString);
     } else {
@@ -105,6 +111,42 @@ void loop() {
     }
     resetReader(); //reset the RFID reader
   }
+}
+
+void getUserData() {
+ //Serial.println(tag); //read out any unknown tag
+ if (sdEnabled && client.connect(server, 80)) {
+   // Make a HTTP request:
+   String query = "GET /verify.php?rfid=-1";
+   query.concat(" HTTP/1.1");
+   Serial.println(query);
+   client.println(query);
+   String hostString = "Host: ";
+   hostString.concat(server);
+   client.println(hostString);
+   client.println("Connection: close");
+   client.println();
+   // Get HTTP response
+   delay(2000);
+   String response = "";
+   boolean bPre = false;
+   boolean buildingBPre = false;
+   String bPreStr = "";
+   boolean ePre = false;
+   boolean buildingEPre = false;
+   String ePreStr = "";
+   File dbFile = SD.open("database.csv", FILE_WRITE);
+   while (client.available()) { 
+     char c = client.read();
+     //Serial.print(c);
+     dbFile.print(c);
+   }
+   dbFile.close();
+ } else {
+   // if you didn't get a connection to the server:
+   displayLCD("connection failed", 5000, true);
+ }
+ client.stop();
 }
 
 String readTag() {
@@ -258,7 +300,7 @@ void resetReader(){
   delay(150);
 }
 
-void accessDenied() {
+void accessDenied(String id) {
   String record = getRecord(id);
   String firstName = getValue(record, dbDelimiter, 1);
   String lastName = getValue(record, dbDelimiter, 2);
