@@ -21,6 +21,12 @@ char pass[] = "PASSWORD";  // your network password (use for WPA, or use as key 
 int keyIndex = 0;            // your network key Index number (needed only for WEP)
 int status = WL_IDLE_STATUS;
 
+// Temperature
+float sensor = 0;
+float voltage = 0;
+int celsius = 0;
+int fahrenheit = 0;
+
 // LCD
 SoftwareSerial mySerial = SoftwareSerial(255, 3);
 
@@ -33,6 +39,7 @@ char server[] = "www.brianmichael.org";
 String validcard = "554948485052706651505767";
 
 // Arduino PINs
+int TEMP = 0;
 int LOCK = 2;
 int RFIDResetPin = 13;
 int GREEN = 8;
@@ -406,6 +413,25 @@ void openDoor(String id) {
   digitalWrite(BLUE, HIGH);
 }
 
+/**
+ */
+int celsiusToFahrenheit(int celsius) {
+  return ((celsius * 9) / 5) + 32;
+}
+
+ 
+/**
+ * Reads the temperature from the TMP35
+ * @see http://arduino.cc/documents/datasheets/TEMP-TMP35_36_37.pdf
+ */
+void getTemps() {
+  sensor = analogRead(TEMP);
+  voltage = ((sensor * 5000)/1024) - 500;
+  celsius = voltage / 10;
+  fahrenheit = celsiusToFahrenheit(celsius);
+}
+
+ 
 /**
  * Prints a message to the LCD screen for a specified length of time
  * Effectively a log method
