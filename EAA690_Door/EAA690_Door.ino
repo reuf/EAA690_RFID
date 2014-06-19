@@ -10,6 +10,32 @@
  * GLOBAL VARIABLES *
  ********************/
 
+// Arduino PINs
+int TEMP = 0;
+int RFID_INPUT = 1;
+int LOCK = 2;
+int LCDDATA = 3;
+int SS_MICROSD = 4;
+int RED = 5;
+int GREEN = 6;
+int WIFI_HANDSHAKE = 7; // RESERVED
+int RFIDResetPin = 8;
+int BLUE = 9;
+int WIFI_SHIELD_10 = 10; // RESERVED
+int WIFI_SHIELD_11 = 11; // RESERVED
+int WIFI_SHIELD_12 = 12; // RESERVED
+int WIFI_SHIELD_13 = 13; // RESERVED
+
+// Color Modes
+int COLOR_MODE_RED = 1;
+int COLOR_MODE_GREEN = 2;
+int COLOR_MODE_BLUE = 3;
+int COLOR_MODE_PURPLE = 4;
+int COLOR_MODE_TEAL = 5;
+int COLOR_MODE_ORANGE = 6;
+int COLOR_MODE_WHITE = 7;
+int COLOR_MODE_OFF = 0;
+
 // Network
 byte mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };
 IPAddress ip(192,168,0,107);
@@ -28,7 +54,7 @@ int celsius = 0;
 int fahrenheit = 0;
 
 // LCD
-SoftwareSerial mySerial = SoftwareSerial(255, 3);
+SoftwareSerial mySerial = SoftwareSerial(255, LCDDATA);
 
 // SD Card
 boolean sdEnabled = true;
@@ -37,15 +63,6 @@ String location = "hangar";
 
 char server[] = "www.brianmichael.org";
 String validcard = "554948485052706651505767";
-
-// Arduino PINs
-int TEMP = 0;
-int LOCK = 2;
-int LCDDATA = 3;
-int RFIDResetPin = 13;
-int GREEN = 9;
-int BLUE = 6;
-int RED = 5;
 
 // NTP (time)
 unsigned long lastCheck = 0;
@@ -58,7 +75,7 @@ byte packetBuffer[NTP_PACKET_SIZE];
 WiFiUDP Udp;
 
 // Debug
-boolean debug = false;
+boolean debug = true;
 
 /************************************************
  * Setup                                        *
@@ -73,7 +90,7 @@ void setup() {
   mySerial.begin(9600); // Init the LCD
   
   // Setup Arduino PINs
-  pinMode(10, OUTPUT); // SD SS pin
+  pinMode(SS_MICROSD, OUTPUT); // SD SS pin
   pinMode(LCDDATA, OUTPUT);
   digitalWrite(LCDDATA, HIGH);
   pinMode(RFIDResetPin, OUTPUT);
@@ -81,7 +98,7 @@ void setup() {
   pinMode(GREEN, OUTPUT);
   pinMode(RED, OUTPUT);
   pinMode(BLUE, OUTPUT);
-  digitalWrite(BLUE, HIGH);
+  setLCDMode(COLOR_MODE_OFF);
   digitalWrite(RFIDResetPin, HIGH);
   
   if (debug) displayLCD("Starting...", 2000, true);
@@ -90,7 +107,7 @@ void setup() {
   initNetwork();
   
   // Check the SD card
-  if (!SD.begin(4)) {
+  if (!SD.begin(SS_MICROSD)) {
     sdEnabled = false;
   }
 }
@@ -107,23 +124,23 @@ void loop() {
     
   // Get the data once per hour, at the top of the hour
   unsigned long nowLong = now();
-  if ((nowLong % 86400) / 60 == 0) {
-    getUserData();
-  }
+  //if ((nowLong % 86400) / 60 == 0) {
+  //  getUserData();
+  //}
 
   // Check to see if a tag needs to be checked
   String tagString = readTag();
   if (tagString == "") {
+    getTemps();
     String timeStr = getTimeAsString();
-    String msg = "Waiting...      " + timeStr;
-    Serial.println(msg);
+    String msg = "Waiting...      " + timeStr + "  " + fahrenheit + "°F";
     displayLCD(msg, 2000, false);
   } else {
-    if (checkTag(tagString)) { //Check if it is a match
+    //if (checkTag(tagString)) { //Check if it is a match
       openDoor(tagString);
-    } else {
+    //} else {
       accessDenied(tagString);
-    }
+    //}
     resetReader(); //reset the RFID reader
   }
 }
@@ -145,7 +162,6 @@ void initNetwork() {
     while (status != WL_CONNECTED) { 
       String msg = "Connecting to   ";
       msg.concat(ssid);
-      msg.concat('\0'); // Terminate string, may not be needed, but doesn't hurt
       if (debug) displayLCD(msg, 1, true);
       // Connect to WPA/WPA2 network. Change this line if using open or WEP network:    
       if (passRequired) {
@@ -200,7 +216,7 @@ void getUserData() {
  * Reads the RFID from the card scanned
  */
 String readTag() {
-  String tagString;
+  String tagString = "";
   int index = 0;
   boolean reading = false;
 
@@ -213,6 +229,7 @@ String readTag() {
       index ++;
     }
   }
+  //if (debug) displayLCD(tagString, 1000, true);
   return tagString;
 }
 
@@ -374,44 +391,40 @@ void resetReader(){
  * Handles the "access denied" state
  */
 void accessDenied(String id) {
-  String record = getRecord(id);
-  String firstName = getValue(record, dbDelimiter, 1);
-  String lastName = getValue(record, dbDelimiter, 2);
-  String message = getValue(record, dbDelimiter, 5);
+  //String record = getRecord(id);
+  //String firstName = getValue(record, dbDelimiter, 1);
+  //String lastName = getValue(record, dbDelimiter, 2);
+  //String message = getValue(record, dbDelimiter, 5);
   //Serial.print("Access Denied for ");
   //Serial.print(firstName);
   //Serial.print(" ");
   //Serial.print(lastName);
   //Serial.print(" ");
   //Serial.println(message);
-  digitalWrite(BLUE, LOW);
-  digitalWrite(RED, HIGH);
-  displayLCD(message, 5000, true);
-  digitalWrite(RED, LOW);
-  digitalWrite(BLUE, HIGH);
+  setLCDMode(COLOR_MODE_RED);
+  displayLCD("Access denied", 5000, true);
+  setLCDMode(COLOR_MODE_BLUE);
 }
 
 /**
  * Handles the "access granted" state
  */
 void openDoor(String id) {
-  String record = getRecord(id);
-  String firstName = getValue(record, dbDelimiter, 1);
-  String lastName = getValue(record, dbDelimiter, 2);
-  String message = getValue(record, dbDelimiter, 5);
+  //String record = getRecord(id);
+  //String firstName = getValue(record, dbDelimiter, 1);
+  //String lastName = getValue(record, dbDelimiter, 2);
+  //String message = getValue(record, dbDelimiter, 5);
   //Serial.print("Opening door for ");
   //Serial.print(firstName);
   //Serial.print(" ");
   //Serial.println(lastName);
-  digitalWrite(BLUE, LOW);
-  digitalWrite(GREEN, HIGH);
+  setLCDMode(COLOR_MODE_GREEN);
   digitalWrite(LOCK, HIGH);
-  displayLCD(message, 5000, true);
+  displayLCD("Hello", 5000, true);
   //Serial.println("Closing door");
   displayLCD("Closing door", 5000, true);
   digitalWrite(LOCK, LOW);
-  digitalWrite(GREEN, LOW);
-  digitalWrite(BLUE, HIGH);
+  setLCDMode(COLOR_MODE_BLUE);
 }
 
 /**
@@ -427,8 +440,9 @@ int celsiusToFahrenheit(int celsius) {
  */
 void getTemps() {
   sensor = analogRead(TEMP);
-  voltage = ((sensor * 5000)/1024) - 500;
-  celsius = voltage / 10;
+  voltage = (sensor * 5000)/1024; // convert raw sensor value to millivolts
+  voltage = voltage - 500;        // remove voltage offset
+  celsius = voltage / 10;         // convert millivolts to Celsius
   fahrenheit = celsiusToFahrenheit(celsius);
 }
 
@@ -438,6 +452,7 @@ void getTemps() {
  * Effectively a log method
  */
 void displayLCD(String msg, int d, boolean backlight) {
+  Serial.println(msg);
   mySerial.write(12);    // Clear             
   if (backlight) {
     mySerial.write(17);  // Turn backlight on
@@ -451,56 +466,56 @@ void displayLCD(String msg, int d, boolean backlight) {
 
 void setLCDMode(int mode) {
   // RED
-  if (mode == 1) {
+  if (mode == COLOR_MODE_RED) {
     digitalWrite(RED, HIGH);
     digitalWrite(GREEN, LOW);
     digitalWrite(BLUE, LOW);
   }
 
   // GREEN
-  if (mode == 2) {
+  if (mode == COLOR_MODE_GREEN) {
     digitalWrite(RED, LOW);
     digitalWrite(GREEN, HIGH);
     digitalWrite(BLUE, LOW);
   }
 
   // BLUE
-  if (mode == 3) {
+  if (mode == COLOR_MODE_BLUE) {
     digitalWrite(RED, LOW);
     digitalWrite(GREEN, LOW);
     digitalWrite(BLUE, HIGH);
   }
 
   // PURPLE (RED+BLUE)
-  if (mode == 4) {
+  if (mode == COLOR_MODE_PURPLE) {
     analogWrite(RED, 127);
     analogWrite(GREEN, 0);
     analogWrite(BLUE, 127);
   }
 
   // TEAL (BLUE+GREEN)
-  if (mode == 5) {
+  if (mode == COLOR_MODE_TEAL) {
     analogWrite(RED, 0);
     analogWrite(GREEN, 127);
     analogWrite(BLUE, 127);
   }
 
   // ORANGE (GREEN+RED)
-  if (mode == 6) {
+  if (mode == COLOR_MODE_ORANGE) {
     analogWrite(RED, 127);
     analogWrite(GREEN, 127);
     analogWrite(BLUE, 0);
   }
 
   // WHITE (RED+GREEN+BLUE)
-  if (mode == 7) {
+  if (mode == COLOR_MODE_WHITE) {
     analogWrite(RED, 85);
     analogWrite(GREEN, 85);
     analogWrite(BLUE, 85);
   }
 
   // OFF
-  if (mode == 0) {
+  if (mode == COLOR_MODE_OFF) {
     digitalWrite(RED, LOW);
     digitalWrite(GREEN, LOW);
     digitalWrite(BLUE, LOW);
