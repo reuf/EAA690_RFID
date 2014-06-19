@@ -41,8 +41,9 @@ String validcard = "554948485052706651505767";
 // Arduino PINs
 int TEMP = 0;
 int LOCK = 2;
+int LCDDATA = 3;
 int RFIDResetPin = 13;
-int GREEN = 8;
+int GREEN = 9;
 int BLUE = 6;
 int RED = 5;
 
@@ -73,8 +74,8 @@ void setup() {
   
   // Setup Arduino PINs
   pinMode(10, OUTPUT); // SD SS pin
-  pinMode(3, OUTPUT);
-  digitalWrite(3, HIGH);
+  pinMode(LCDDATA, OUTPUT);
+  digitalWrite(LCDDATA, HIGH);
   pinMode(RFIDResetPin, OUTPUT);
   pinMode(LOCK, OUTPUT);
   pinMode(GREEN, OUTPUT);
