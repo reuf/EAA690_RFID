@@ -41,9 +41,9 @@ byte mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };
 IPAddress ip(192,168,0,107);
 WiFiClient client;
 boolean wifiEnabled = true;
-boolean passRequired = true;
-char ssid[] = "bmichael"; // EAA690 your network SSID (name) // EAA690
-char pass[] = "4047355660";  // your network password (use for WPA, or use as key for WEP)
+boolean passRequired = false;
+char ssid[] = "EAA690"; // EAA690 your network SSID (name) // EAA690
+char pass[] = "PASSWORD";  // your network password (use for WPA, or use as key for WEP)
 int keyIndex = 0;            // your network key Index number (needed only for WEP)
 int status = WL_IDLE_STATUS;
 
