@@ -448,3 +448,61 @@ void displayLCD(String msg, int d, boolean backlight) {
     mySerial.write(18);  // Turn backlight off
   }
 }
+
+void setLCDMode(int mode) {
+  // RED
+  if (mode == 1) {
+    digitalWrite(RED, HIGH);
+    digitalWrite(GREEN, LOW);
+    digitalWrite(BLUE, LOW);
+  }
+
+  // GREEN
+  if (mode == 2) {
+    digitalWrite(RED, LOW);
+    digitalWrite(GREEN, HIGH);
+    digitalWrite(BLUE, LOW);
+  }
+
+  // BLUE
+  if (mode == 3) {
+    digitalWrite(RED, LOW);
+    digitalWrite(GREEN, LOW);
+    digitalWrite(BLUE, HIGH);
+  }
+
+  // PURPLE (RED+BLUE)
+  if (mode == 4) {
+    analogWrite(RED, 127);
+    analogWrite(GREEN, 0);
+    analogWrite(BLUE, 127);
+  }
+
+  // TEAL (BLUE+GREEN)
+  if (mode == 5) {
+    analogWrite(RED, 0);
+    analogWrite(GREEN, 127);
+    analogWrite(BLUE, 127);
+  }
+
+  // ORANGE (GREEN+RED)
+  if (mode == 6) {
+    analogWrite(RED, 127);
+    analogWrite(GREEN, 127);
+    analogWrite(BLUE, 0);
+  }
+
+  // WHITE (RED+GREEN+BLUE)
+  if (mode == 7) {
+    analogWrite(RED, 85);
+    analogWrite(GREEN, 85);
+    analogWrite(BLUE, 85);
+  }
+
+  // OFF
+  if (mode == 0) {
+    digitalWrite(RED, LOW);
+    digitalWrite(GREEN, LOW);
+    digitalWrite(BLUE, LOW);
+  }
+}
