@@ -45,10 +45,43 @@
    
 */
 
+#include <Wire.h>
+#include <EasyTransferI2C.h>
+
 /********************
  * GLOBAL VARIABLES *
  ********************/
+int ID = 1;
 int RFIDResetPin = 8;
+int LOCK = 2;
+int RED = 5;
+int GREEN = 6;
+int BLUE = 7;
+
+// Color Modes
+int COLOR_MODE_RED = 1;
+int COLOR_MODE_GREEN = 2;
+int COLOR_MODE_BLUE = 3;
+int COLOR_MODE_PURPLE = 4;
+int COLOR_MODE_TEAL = 5;
+int COLOR_MODE_ORANGE = 6;
+int COLOR_MODE_WHITE = 7;
+int COLOR_MODE_OFF = 0;
+
+// Transfer Object
+EasyTransferI2C ET; 
+
+struct RECEIVE_DATA_STRUCTURE{
+  int id;
+  String tag;
+  boolean accessGranted;
+};
+
+// Give a name to the group of data
+RECEIVE_DATA_STRUCTURE transferData;
+
+//define slave i2c address
+#define I2C_SLAVE_ADDRESS 9
 
 /************************************************
  * Setup                                        *
@@ -64,7 +97,18 @@ void setup() {
   // Initialize the RFID reader for use
   digitalWrite(RFIDResetPin, HIGH);
   
+  Wire.begin(I2C_SLAVE_ADDRESS);
+
+  // Start the library, pass in the data details and the name of the serial port. 
+  // Can be Serial, Serial1, Serial2, etc. 
+  ET.begin(details(transferData), &Wire);
+
+  // Define handler function on receiving data
+  Wire.onReceive(receive);
+
   Serial.begin(9600);  // set up Serial library at 9600 bps
+  
+  setLEDMode(COLOR_MODE_OFF);
 }
 
 /************************************************
@@ -91,13 +135,110 @@ void loop() {
     }
   }
   if (tagString == "") { // No tag data read
-    delay(1000); // Delay 1 second
+    delay(150); // Delay a bit
   } else {
-    Serial.println(tagString); // Check if access is allowed
+    transferData.id = ID;
+    transferData.tag = tagString;
+    transferData.accessGranted = false;
+ 
+    // Check if access is allowed
+    ET.sendData(I2C_SLAVE_ADDRESS);
 
     //reset the RFID reader
     digitalWrite(RFIDResetPin, LOW);
     digitalWrite(RFIDResetPin, HIGH);
     delay(150);
+  }
+  
+  // Check and see if a data packet has come in. 
+  if (ET.receiveData()) {
+    if (transferData.accessGranted) {
+      openDoor();
+    } else {
+      accessDenied();
+    }
+  }
+}
+
+void receive(int numBytes) {}
+
+/**
+ * Handles the "access denied" state
+ */
+void accessDenied() {
+  setLEDMode(COLOR_MODE_RED);
+  delay(5000);
+  setLEDMode(COLOR_MODE_BLUE);
+}
+
+/**
+ * Handles the "access granted" state
+ */
+void openDoor() {
+  setLEDMode(COLOR_MODE_GREEN);
+  digitalWrite(LOCK, HIGH);
+  delay(10000);
+  digitalWrite(LOCK, LOW);
+  setLEDMode(COLOR_MODE_BLUE);
+}
+
+/**
+ * Sets the color of the tri-color LED
+ */
+void setLEDMode(int mode) {
+  // RED
+  if (mode == COLOR_MODE_RED) {
+    digitalWrite(RED, HIGH);
+    digitalWrite(GREEN, LOW);
+    digitalWrite(BLUE, LOW);
+  }
+
+  // GREEN
+  if (mode == COLOR_MODE_GREEN) {
+    digitalWrite(RED, LOW);
+    digitalWrite(GREEN, HIGH);
+    digitalWrite(BLUE, LOW);
+  }
+
+  // BLUE
+  if (mode == COLOR_MODE_BLUE) {
+    digitalWrite(RED, LOW);
+    digitalWrite(GREEN, LOW);
+    digitalWrite(BLUE, HIGH);
+  }
+
+  // PURPLE (RED+BLUE)
+  if (mode == COLOR_MODE_PURPLE) {
+    analogWrite(RED, 127);
+    analogWrite(GREEN, 0);
+    analogWrite(BLUE, 127);
+  }
+
+  // TEAL (BLUE+GREEN)
+  if (mode == COLOR_MODE_TEAL) {
+    analogWrite(RED, 0);
+    analogWrite(GREEN, 127);
+    analogWrite(BLUE, 127);
+  }
+
+  // ORANGE (GREEN+RED)
+  if (mode == COLOR_MODE_ORANGE) {
+    analogWrite(RED, 127);
+    analogWrite(GREEN, 127);
+    analogWrite(BLUE, 0);
+  }
+
+  // WHITE (RED+GREEN+BLUE)
+  if (mode == COLOR_MODE_WHITE) {
+    analogWrite(RED, 85);
+    analogWrite(GREEN, 85);
+    analogWrite(BLUE, 85);
+  }
+
+  // OFF
+  if (mode == COLOR_MODE_OFF) {
+    digitalWrite(RED, LOW);
+    digitalWrite(GREEN, LOW);
+    digitalWrite(BLUE, LOW);
   }
 }
