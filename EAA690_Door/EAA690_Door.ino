@@ -57,6 +57,7 @@ int LOCK = 2;
 int RED = 5;
 int GREEN = 6;
 int BLUE = 7;
+int I2C = 9;
 
 // Color Modes
 int COLOR_MODE_RED = 1;
@@ -71,17 +72,15 @@ int COLOR_MODE_OFF = 0;
 // Transfer Object
 EasyTransferI2C ET; 
 
-struct RECEIVE_DATA_STRUCTURE{
+struct RECEIVE_DATA_STRUCTURE {
   int id;
+  int i2c;
   String tag;
   boolean accessGranted;
 };
 
 // Give a name to the group of data
 RECEIVE_DATA_STRUCTURE transferData;
-
-//define slave i2c address
-#define I2C_SLAVE_ADDRESS 9
 
 /************************************************
  * Setup                                        *
@@ -97,7 +96,7 @@ void setup() {
   // Initialize the RFID reader for use
   digitalWrite(RFIDResetPin, HIGH);
   
-  Wire.begin(I2C_SLAVE_ADDRESS);
+  Wire.begin(I2C);
 
   // Start the library, pass in the data details and the name of the serial port. 
   // Can be Serial, Serial1, Serial2, etc. 
@@ -136,11 +135,12 @@ void loop() {
   }
   if (tagString != "") { // Tag data read
     transferData.id = ID;
+    transferData.i2c = I2C;
     transferData.tag = tagString;
     transferData.accessGranted = false;
  
     // Check if access is allowed
-    ET.sendData(I2C_SLAVE_ADDRESS);
+    ET.sendData(I2C);
 
     //reset the RFID reader
     digitalWrite(RFIDResetPin, LOW);

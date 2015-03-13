@@ -67,6 +67,12 @@ unsigned long lastTime = 0;
 // Arduino PINs
 int SS_MICROSD = 4;
 int RFIDResetPin = 8;
+int I2C_1 = 3;
+int I2C_2 = 5;
+int I2C_3 = 6;
+int I2C_4 = 7;
+int I2C_5 = 9;
+int I2C_6 = 11;
 
 // Network
 byte mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };
@@ -80,17 +86,15 @@ String validcard = "554948485052706651505767";
 // Transfer Object
 EasyTransferI2C ET; 
 
-struct RECEIVE_DATA_STRUCTURE{
+struct RECEIVE_DATA_STRUCTURE {
   int id;
+  int i2c;
   String tag;
   boolean accessGranted;
 };
 
 // Give a name to the group of data
 RECEIVE_DATA_STRUCTURE transferData;
-
-//define slave i2c address
-#define I2C_SLAVE_ADDRESS 9
 
 /************************************************
  * Setup                                        *
@@ -115,7 +119,12 @@ void setup() {
   // Give the Ethernet shield a second to initialize
   delay(1000);
   
-  Wire.begin(I2C_SLAVE_ADDRESS);
+  Wire.begin(I2C_1);
+  Wire.begin(I2C_2);
+  Wire.begin(I2C_3);
+  Wire.begin(I2C_4);
+  Wire.begin(I2C_5);
+  Wire.begin(I2C_6);
   
   // Start the library, pass in the data details and the name of the serial port. 
   // Can be Serial, Serial1, Serial2, etc. 
@@ -180,7 +189,7 @@ void checkTag(int numBytes) {
   unsigned long nowLong = ntpUnixTime(udp);
   
   if (transferData.tag == "") {
-    transferData.accessGranted = false; //empty, no need to contunue
+    transferData.accessGranted = false; //empty, no need to continue
   } else if (transferData.tag == validcard) {
     transferData.accessGranted = true; // Override this particular card
   } else {
@@ -191,6 +200,10 @@ void checkTag(int numBytes) {
       transferData.accessGranted = true;
     }
   }
+  
+  // Send response back to door
+  ET.sendData(transferData.i2c);
+
   File logFile = SD.open("system.log", FILE_WRITE);
   if (logFile) {
     logFile.println(nowLong + "," + transferData.tag + "," + "," + transferData.id + "," + transferData.accessGranted);
