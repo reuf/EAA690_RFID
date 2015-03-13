@@ -51,44 +51,31 @@
 #include <SD.h>
 #include <EasyTransferI2C.h>
 #include <Time.h>
-#include <WiFi.h>
-#include <WiFiUdp.h>
+#include <SPI.h>
+#include <Dhcp.h>
+#include <Dns.h>
+#include <Ethernet.h>
+#include <EthernetClient.h>
+#include <EthernetUdp.h>
+#include <util.h>
 
 /********************
  * GLOBAL VARIABLES *
  ********************/
-
+unsigned long lastTime = 0;
+  
 // Arduino PINs
 int SS_MICROSD = 4;
 int RFIDResetPin = 8;
 
 // Network
 byte mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };
-IPAddress ip(192,168,0,107);
-WiFiClient client;
-boolean wifiEnabled = true;
-boolean passRequired = false;
-char ssid[] = "EAA690"; // EAA690 your network SSID (name) // EAA690
-char pass[] = "PASSWORD";  // your network password (use for WPA, or use as key for WEP)
-int keyIndex = 0;            // your network key Index number (needed only for WEP)
-int status = WL_IDLE_STATUS;
-
-// SD Card
-boolean sdEnabled = true;
-char dbDelimiter = ',';
-
 char server[] = "www.brianmichael.org";
-String validcard = "554948485052706651505767";
+IPAddress ip(192,168,0,107);
+EthernetClient client;
 
-// NTP (time)
-unsigned long lastCheck = 0;
-unsigned long epoch = 0;
-long checkDelay = 600000;
-unsigned int localPort = 2390; // local port to listen for UDP packets
-IPAddress timeServer(129, 6, 15, 28); // time.nist.gov NTP server
-const int NTP_PACKET_SIZE = 48; // NTP time stamp is in the first 48 bytes of the message
-byte packetBuffer[NTP_PACKET_SIZE];
-WiFiUDP Udp;
+// Testing...
+String validcard = "554948485052706651505767";
 
 // Transfer Object
 EasyTransferI2C ET; 
@@ -119,13 +106,14 @@ void setup() {
   // Setup Arduino PINs
   pinMode(SS_MICROSD, OUTPUT); // SD SS pin
   
-  // Init the network
-  initNetwork();
+  // Start the Ethernet connection
+  if (Ethernet.begin(mac) == 0) {
+    // Try to configure using IP address instead of DHCP
+    Ethernet.begin(mac, ip);
+  } 
   
-  // Check the SD card
-  if (!SD.begin(SS_MICROSD)) {
-    sdEnabled = false;
-  }
+  // Give the Ethernet shield a second to initialize
+  delay(1000);
   
   Wire.begin(I2C_SLAVE_ADDRESS);
   
@@ -145,41 +133,16 @@ void setup() {
  * repeatedly until the arduino is powered off  *
  ************************************************/
 void loop() {
-  // Get the data once per hour, at the top of the hour
-  unsigned long nowLong = now();
-  //if ((nowLong % 86400) / 60 == 0) {
-  //  getUserData();
-  //}
+  // Get the data once an hour
+  EthernetUDP udp;
+  unsigned long time = ntpUnixTime(udp);
 
-  String timeStr = getTimeAsString();
-}
-
-/**
- * Initialize the network so user and NTP data 
- * can be transmitted/received
- */
-void initNetwork() {
-  // check for the presence of the shield:
-  if (WiFi.status() == WL_NO_SHIELD) {
-    // don't continue:
-    wifiEnabled = false;
-  } 
-  
-  // attempt to connect to Wifi network:
-  if (wifiEnabled) {
-    while (status != WL_CONNECTED) { 
-      // Connect to WPA/WPA2 network. Change this line if using open or WEP network:    
-      if (passRequired) {
-        status = WiFi.begin(ssid, pass);
-      } else {
-        status = WiFi.begin(ssid);
-      }
-  
-      // wait 1 second for connection:
-      delay(1000);
-    } 
-    Udp.begin(localPort);
+  if (time >= lastTime + 3600) {
+    getUserData();
+    lastTime = time;
   }
+  
+  delay(1000);
 }
 
 /**
@@ -187,13 +150,10 @@ void initNetwork() {
  * on the SD card.
  */
 void getUserData() {
-  //Serial.println(tag); //read out any unknown tag
-  if (wifiEnabled && sdEnabled && client.connect(server, 80)) {
+  if (client.connect(server, 80)) {
+    SD.remove("database.csv");
     // Make a HTTP request:
-    String query = "GET /csv.php";
-    query.concat(" HTTP/1.1");
-    //Serial.println(query);
-    client.println(query);
+    client.println("GET /csv.php HTTP/1.1");
     String hostString = "Host: ";
     hostString.concat(server);
     client.println(hostString);
@@ -201,90 +161,40 @@ void getUserData() {
     client.println();
     // Get HTTP response
     File dbFile = SD.open("database.csv", FILE_WRITE);
-    while (client.available()) { 
-      char c = client.read();
-      //Serial.print(c);
-      dbFile.print(c);
+    if (dbFile) {
+      while (client.available()) { 
+        char c = client.read();
+        dbFile.print(c);
+      }
+      dbFile.close();
     }
-    dbFile.close();
     client.stop();
   }
-}
-
-/**
- * Updates the arduino's "clock" with the current time from 
- * time.nist.gov
- */
-void updateTime() {
-  unsigned long currentMillis = millis();
-  if (epoch <= 0 || currentMillis - lastCheck > checkDelay) {
-    lastCheck = currentMillis;
-    sendNTPpacket(timeServer);
-    if (Udp.parsePacket()) {
-      Udp.read(packetBuffer, NTP_PACKET_SIZE);
-      unsigned long highWord = word(packetBuffer[40], packetBuffer[41]);
-      unsigned long lowWord = word(packetBuffer[42], packetBuffer[43]);
-      unsigned long secsSince1900 = highWord << 16 | lowWord;
-      const unsigned long seventyYears = 2208988800UL;
-      epoch = secsSince1900 - seventyYears;
-      time_t ntptime = epoch;
-      setTime(ntptime);   // Sync Arduino clock to the time received via NTP
-    } 
-  }
-}
-
-/**
- * Formats the arduino's "clock" time to a human readable format
- */
-String getTimeAsString() {
-  updateTime();
-  unsigned long nowLong = now();
-  String timeStr = "";
-  timeStr.concat((nowLong % 86400) / 3600);
-  timeStr.concat(":");
-  if (((nowLong % 3600) / 60) <  10) {
-    timeStr.concat("0");
-  }
-  timeStr.concat((nowLong % 3600) / 60);
-  timeStr.concat(":");
-  if ((nowLong % 60) <  10) {
-    timeStr.concat("0");
-  }
-  timeStr.concat(nowLong % 60);
-  timeStr.concat("Z");
-  return timeStr;
-}
-
-/**
- * Helper method for updateTime().  
- * Sends a UDP packet to time.nist.gov to get a NTP packet
- */
-unsigned long sendNTPpacket(IPAddress& address) {
-  memset(packetBuffer, 0, NTP_PACKET_SIZE);
-  packetBuffer[0] = 0b11100011;
-  packetBuffer[1] = 0;
-  packetBuffer[2] = 6;
-  packetBuffer[3] = 0xEC;
-  packetBuffer[12] = 49;
-  packetBuffer[13] = 0x4E;
-  packetBuffer[14] = 49;
-  packetBuffer[15] = 52;
-  Udp.beginPacket(address, 123);
-  Udp.write(packetBuffer, NTP_PACKET_SIZE);
-  Udp.endPacket();
 }
 
 /**
  * Check the read tag against known tags
  */
 void checkTag(int numBytes) {
-  if (transferData.tag == "") transferData.accessGranted = false; //empty, no need to contunue
-  if (transferData.tag == validcard) transferData.accessGranted = true; // Override this particular card
-
-  String record = getRecord(transferData.tag);
-  String access = getValue(record, dbDelimiter,  4);
-  if (true) { //TOOD
-    transferData.accessGranted = true;
+  EthernetUDP udp;
+  unsigned long nowLong = ntpUnixTime(udp);
+  
+  if (transferData.tag == "") {
+    transferData.accessGranted = false; //empty, no need to contunue
+  } else if (transferData.tag == validcard) {
+    transferData.accessGranted = true; // Override this particular card
+  } else {
+    // 1. Find the record in the database file (on the SD card)
+    // 2. Look for the "Door ID" value
+    // 3. If it is a "1", then access is granted
+    if (getValue(getRecord(transferData.tag), ',',  transferData.id + 1) == "1") {
+      transferData.accessGranted = true;
+    }
+  }
+  File logFile = SD.open("system.log", FILE_WRITE);
+  if (logFile) {
+    logFile.println(nowLong + "," + transferData.tag + "," + "," + transferData.id + "," + transferData.accessGranted);
+    logFile.close();
   }
 }
 
@@ -293,26 +203,24 @@ void checkTag(int numBytes) {
  */
 String getRecord(String tag) {
   String returnLine;
-  if (sdEnabled) {
-    if (SD.exists("database.csv")) {
-      File dbFile = SD.open("database.csv");
-      String line = ""; // = "554948485052706651505767|1|0|0|0|0|0";
-      int i = 0;
-      while (dbFile.available()) {
-        char c = dbFile.read();
-        if (c == '\n') {
-          String id = getValue(line, dbDelimiter,  0);
-          if (id == tag) {
-            returnLine = line;
-            break;
-          }
-          line = "";
-        } else {
-          line += c;
+  if (SD.exists("database.csv")) {
+    File dbFile = SD.open("database.csv");
+    String line = ""; // = "554948485052706651505767,1,0,0,0,0,0";
+    int i = 0;
+    while (dbFile.available()) {
+      char c = dbFile.read();
+      if (c == '\n') {
+        String id = getValue(line, ',',  0);
+        if (id == tag) {
+          returnLine = line;
+          break;
         }
+        line = "";
+      } else {
+        line += c;
       }
-      dbFile.close();
     }
+    dbFile.close();
   }
   return returnLine;
 }
@@ -335,4 +243,75 @@ String getValue(String data, char separator, int index) {
   }
 
   return found>index ? data.substring(strIndex[0], strIndex[1]) : "";
+}
+
+/*
+ * © Francesco Potortì 2013 - GPLv3 - Revision: 1.13
+ *
+ * Send an NTP packet and wait for the response, return the Unix time
+ *
+ * To lower the memory footprint, no buffers are allocated for sending
+ * and receiving the NTP packets.  Four bytes of memory are allocated
+ * for transmision, the rest is random garbage collected from the data
+ * memory segment, and the received packet is read one byte at a time.
+ * The Unix time is returned, that is, seconds from 1970-01-01T00:00.
+ */
+unsigned long inline ntpUnixTime (UDP &udp)
+{
+  static int udpInited = udp.begin(123); // open socket on arbitrary port
+
+  const char timeServer[] = "pool.ntp.org";  // NTP server
+
+  // Only the first four bytes of an outgoing NTP packet need to be set
+  // appropriately, the rest can be whatever.
+  const long ntpFirstFourBytes = 0xEC0600E3; // NTP request header
+
+  // Fail if WiFiUdp.begin() could not init a socket
+  if (! udpInited)
+    return 0;
+
+  // Clear received data from possible stray received packets
+  udp.flush();
+
+  // Send an NTP request
+  if (! (udp.beginPacket(timeServer, 123) // 123 is the NTP port
+	 && udp.write((byte *)&ntpFirstFourBytes, 48) == 48
+	 && udp.endPacket()))
+    return 0;				// sending request failed
+
+  // Wait for response; check every pollIntv ms up to maxPoll times
+  const int pollIntv = 150;		// poll every this many ms
+  const byte maxPoll = 15;		// poll up to this many times
+  int pktLen;				// received packet length
+  for (byte i=0; i<maxPoll; i++) {
+    if ((pktLen = udp.parsePacket()) == 48)
+      break;
+    delay(pollIntv);
+  }
+  if (pktLen != 48)
+    return 0;				// no correct packet received
+
+  // Read and discard the first useless bytes
+  // Set useless to 32 for speed; set to 40 for accuracy.
+  const byte useless = 40;
+  for (byte i = 0; i < useless; ++i)
+    udp.read();
+
+  // Read the integer part of sending time
+  unsigned long time = udp.read();	// NTP time
+  for (byte i = 1; i < 4; i++)
+    time = time << 8 | udp.read();
+
+  // Round to the nearest second if we want accuracy
+  // The fractionary part is the next byte divided by 256: if it is
+  // greater than 500ms we round to the next second; we also account
+  // for an assumed network delay of 50ms, and (0.5-0.05)*256=115;
+  // additionally, we account for how much we delayed reading the packet
+  // since its arrival, which we assume on average to be pollIntv/2.
+  time += (udp.read() > 115 - pollIntv/8);
+
+  // Discard the rest of the packet
+  udp.flush();
+
+  return time - 2208988800ul;		// convert NTP time to Unix time
 }
