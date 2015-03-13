@@ -134,9 +134,7 @@ void loop() {
       index ++;
     }
   }
-  if (tagString == "") { // No tag data read
-    delay(150); // Delay a bit
-  } else {
+  if (tagString != "") { // Tag data read
     transferData.id = ID;
     transferData.tag = tagString;
     transferData.accessGranted = false;
@@ -147,7 +145,6 @@ void loop() {
     //reset the RFID reader
     digitalWrite(RFIDResetPin, LOW);
     digitalWrite(RFIDResetPin, HIGH);
-    delay(150);
   }
   
   // Check and see if a data packet has come in. 
@@ -158,8 +155,12 @@ void loop() {
       accessDenied();
     }
   }
+  
+  // A short delay...
+  delay(150);
 }
 
+// Placeholder for EasyTransfer struct response
 void receive(int numBytes) {}
 
 /**
