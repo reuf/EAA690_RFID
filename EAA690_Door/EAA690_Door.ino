@@ -52,11 +52,11 @@
  * GLOBAL VARIABLES *
  ********************/
 int ID = 1;
-int RFIDResetPin = 8;
 int LOCK = 2;
 int RED = 5;
 int GREEN = 6;
 int BLUE = 7;
+int RFIDResetPin = 8;
 int I2C = 9;
 
 // Color Modes
@@ -81,6 +81,8 @@ struct RECEIVE_DATA_STRUCTURE {
 
 // Give a name to the group of data
 RECEIVE_DATA_STRUCTURE transferData;
+
+String VALID_CARD = "710024FB329C";
 
 /************************************************
  * Setup                                        *
@@ -117,23 +119,21 @@ void setup() {
  * arduinos.  This function will be called      *
  * repeatedly until the arduino is powered off  *
  ************************************************/
-void loop() {
-  // Check to see if a tag needs to be checked
+void loop() {    
   String tagString = "";
-  int index = 0;
-  boolean reading = false;
+  char val = 0; // variable to store the data from the serial port
 
-  // Reads the RFID from the card scanned
-  while (Serial.available()) {
-    int readByte = Serial.read(); //read next available byte
-    if(readByte == 2) reading = true; //begining of tag
-    if(readByte == 3) reading = false; //end of tag
-    if(reading && readByte != 2 && readByte != 10 && readByte != 13){
-      tagString = tagString + readByte;
-      index ++;
-    }
+  // Check to see if a tag needs to be checked
+  while (Serial.available() > 0) {
+    val = Serial.read();
+    tagString = tagString + val;
+    Serial.print(val);
   }
+  
   if (tagString != "") { // Tag data read
+    tagString.replace("\n", "");
+    tagString = tagString.substring(1, tagString.length() - 1);
+
     transferData.id = ID;
     transferData.i2c = I2C;
     transferData.tag = tagString;
@@ -143,8 +143,8 @@ void loop() {
     ET.sendData(I2C);
 
     //reset the RFID reader
-    digitalWrite(RFIDResetPin, LOW);
-    digitalWrite(RFIDResetPin, HIGH);
+    //digitalWrite(RFIDResetPin, LOW);
+    //digitalWrite(RFIDResetPin, HIGH);
   }
   
   // Check and see if a data packet has come in. 
@@ -169,7 +169,7 @@ void receive(int numBytes) {}
 void accessDenied() {
   setLEDMode(COLOR_MODE_RED);
   delay(5000);
-  setLEDMode(COLOR_MODE_BLUE);
+  setLEDMode(COLOR_MODE_OFF);
 }
 
 /**
@@ -180,7 +180,7 @@ void openDoor() {
   digitalWrite(LOCK, HIGH);
   delay(10000);
   digitalWrite(LOCK, LOW);
-  setLEDMode(COLOR_MODE_BLUE);
+  setLEDMode(COLOR_MODE_OFF);
 }
 
 /**
