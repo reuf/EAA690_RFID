@@ -7,10 +7,10 @@
    2. Reset and read the RFID chip
    3. Send power to the door lock as appropriate
    
- Simple schematic of overall system.  This sketch is for the "[Inside]" portion of the diagram.
+ Simple schematic of overall system.  This sketch is for the "[Door Controller]" portion of the diagram.
  
             ^  ^
-           +|  |- [Inside]
+           +|  |- 
    +----------------+
    |    | to door | |
    |    +---------+ |           [Outside]
@@ -29,20 +29,21 @@
    |   +------+     |
    |   | RJ45 |     |
    +----------------+
+         ||||  [Door Controller]      [New Card Assignment]
+                                     +------------------+
+         ////                        | +--------------+ |
+                                     | | Arduino MINI | |
+         ||||  [Main Controller]     | +--------------+ |
+   +----------------------+          | +------+         |
+   |   | RJ45 |  +------+ |          | | RFID |         |
+   |   +------+  | RFID | |          | +------+         |
+   |    LM7805   +------+ |          | +--------------+ |
+   | +-------------+----+ |          | | Raspberry Pi | |
+   | | Arduino UNO | SD | |          | +--------------+ |
+   | +-------------+----+ |          +------------------+
+   | | Ethernet    |      |
+   +----------------------+         
          ||||
-      
-         ////
-      
-         ||||  [Controller]
-   +----------------------+
-   |   | RJ45 |  +------+ |
-   |   +------+  | RFID | |
-   |             +------+ |
-   | +-------------+      |
-   | | Arduino UNO |      |
-   | +-------------+      |
-   +----------------------+
-   
 */
 
 #include <Wire.h>

@@ -3,16 +3,27 @@
  ************
  This sketch is intended for the Arduino UNO which acts as a controller for the entire system.
  The tasks are:
-   1. Keep track of time, and record events (on an SD card) noting the time each occurs
-   2. Maintain a database (on an SD card) of RFID cards and their validity for a given door.
-   3. Respond to door controller (represented by [Inside] in the diagram below) requests with card accessibility.
-   4. Maintain a database (on an SD card) via a network connection to the EAA 690 membership database.
-   5. Publish event activity on a regular basis to an external system.
+   // General tasks
+   1. Keep track of time.
    
- Simple schematic of overall system.  This sketch is for the "[Controller]" portion of the diagram.
+   // Event tasks (stored on an SD card)
+   2. Record access events noting the time each occurs.
+   3. Provide access to event activity upon request.
+   4. Provide the ability to purge access data.
+
+   // Database tasks (stored on an SD card)
+   5. Maintain (CRUD operations) a database of RFID cards and their validity for a given door.
+   6. Respond to "Door Controller" requests with card accessibility.
+   7. Provide the ability to force a refresh of the database.
+   8. Perform a database refresh on a timed basis.
+
+   // Network tasks
+   9. Maintain a network connection to the EAA 690 membership database.
+   
+ Simple schematic of overall system.  This sketch is for the "[Main Controller]" portion of the diagram.
  
             ^  ^
-           +|  |- [Inside]
+           +|  |- 
    +----------------+
    |    | to door | |
    |    +---------+ |           [Outside]
@@ -31,20 +42,21 @@
    |   +------+     |
    |   | RJ45 |     |
    +----------------+
+         ||||  [Door Controller]     [New Card Assignment]
+                                    +------------------+
+         ////                       | +--------------+ |
+                                    | | Arduino MINI | |
+         ||||  [Main Controller]    | +--------------+ |
+   +----------------------+         | +------+         |
+   |   | RJ45 |  +------+ |         | | RFID |         |
+   |   +------+  | RFID | |         | +------+         |
+   |    LM7805   +------+ |         | +--------------+ |
+   | +-------------+----+ |         | | Raspberry Pi | |
+   | | Arduino UNO | SD | |         | +--------------+ |
+   | +-------------+----+ |         +------------------+
+   | | Ethernet    |      |
+   +----------------------+         
          ||||
-      
-         ////
-      
-         ||||  [Controller]
-   +----------------------+
-   |   | RJ45 |  +------+ |
-   |   +------+  | RFID | |
-   |             +------+ |
-   | +-------------+      |
-   | | Arduino UNO |      |
-   | +-------------+      |
-   +----------------------+
-   
 */
 
 #include <Wire.h>
