@@ -47,7 +47,6 @@
 */
 
 #include <Wire.h>
-#include <EasyTransferI2C.h>
 
 /********************
  * GLOBAL VARIABLES *
@@ -70,20 +69,7 @@ int COLOR_MODE_ORANGE = 6;
 int COLOR_MODE_WHITE = 7;
 int COLOR_MODE_OFF = 0;
 
-// Transfer Object
-EasyTransferI2C ET; 
-
-struct RECEIVE_DATA_STRUCTURE {
-  int id;
-  int i2c;
-  String tag;
-  boolean accessGranted;
-};
-
-// Give a name to the group of data
-RECEIVE_DATA_STRUCTURE transferData;
-
-String VALID_CARD = "710024FB329C";
+String tag;
 
 /************************************************
  * Setup                                        *
@@ -100,13 +86,7 @@ void setup() {
   digitalWrite(RFIDResetPin, HIGH);
   
   Wire.begin(I2C);
-
-  // Start the library, pass in the data details and the name of the serial port. 
-  // Can be Serial, Serial1, Serial2, etc. 
-  ET.begin(details(transferData), &Wire);
-
-  // Define handler function on receiving data
-  Wire.onReceive(receive);
+  Wire.onRequest(requestEvent); // register event
 
   Serial.begin(9600);  // set up Serial library at 9600 bps
   
@@ -121,48 +101,52 @@ void setup() {
  * repeatedly until the arduino is powered off  *
  ************************************************/
 void loop() {    
-  String tagString = "";
   char val = 0; // variable to store the data from the serial port
 
   // Check to see if a tag needs to be checked
-  while (Serial.available() > 0) {
-    val = Serial.read();
-    tagString = tagString + val;
-    Serial.print(val);
-  }
-  
-  if (tagString != "") { // Tag data read
-    tagString.replace("\n", "");
-    tagString = tagString.substring(1, tagString.length() - 1);
-
-    transferData.id = ID;
-    transferData.i2c = I2C;
-    transferData.tag = tagString;
-    transferData.accessGranted = false;
- 
-    // Check if access is allowed
-    ET.sendData(I2C);
-
-    //reset the RFID reader
-    //digitalWrite(RFIDResetPin, LOW);
-    //digitalWrite(RFIDResetPin, HIGH);
-  }
-  
-  // Check and see if a data packet has come in. 
-  if (ET.receiveData()) {
-    if (transferData.accessGranted) {
-      openDoor();
-    } else {
-      accessDenied();
+  if (tag == "") {
+    while (Serial.available() > 0) {
+      val = Serial.read();
+      tag = tag + val;
+    }
+    if (tag != "") {
+      tag.replace("\n", "");
+      tag = tag.substring(1, tag.length() - 1);
     }
   }
   
+  //reset the RFID reader
+  //digitalWrite(RFIDResetPin, LOW);
+  //digitalWrite(RFIDResetPin, HIGH);
+    
   // A short delay...
   delay(150);
 }
 
-// Placeholder for EasyTransfer struct response
-void receive(int numBytes) {}
+// Called by Main Controller to see if a card has been read.
+void requestEvent() {
+  if (tag != "") {
+    Wire.write(tag);
+    boolean responseReceived = false;
+    while (!responseReceived) {
+      if (Wire.available()) {
+        responseReceived = true;
+        char access = Wire.read(); // receive access response
+        if (access == 'Y') {
+          openDoor();
+        } else if (access == 'N') {
+          accessDenied();
+        }
+      } else {
+        // A short delay...
+        delay(150);
+      }
+    }
+    tag = "";
+  } else {
+    Wire.write("0");
+  }
+}
 
 /**
  * Handles the "access denied" state

@@ -61,7 +61,6 @@
 
 #include <Wire.h>
 #include <SD.h>
-#include <EasyTransferI2C.h>
 #include <Time.h>
 #include <SPI.h>
 #include <Dhcp.h>
@@ -79,34 +78,13 @@ unsigned long lastTime = 0;
 // Arduino PINs
 int SS_MICROSD = 4;
 int RFIDResetPin = 8;
-int I2C_1 = 3;
-int I2C_2 = 5;
-int I2C_3 = 6;
-int I2C_4 = 7;
-int I2C_5 = 9;
-int I2C_6 = 11;
+int I2C = 9;
 
 // Network
 byte mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };
 char server[] = "www.brianmichael.org";
 IPAddress ip(192,168,0,107);
 EthernetClient client;
-
-// Testing...
-String validcard = "554948485052706651505767";
-
-// Transfer Object
-EasyTransferI2C ET; 
-
-struct RECEIVE_DATA_STRUCTURE {
-  int id;
-  int i2c;
-  String tag;
-  boolean accessGranted;
-};
-
-// Give a name to the group of data
-RECEIVE_DATA_STRUCTURE transferData;
 
 /************************************************
  * Setup                                        *
@@ -131,19 +109,7 @@ void setup() {
   // Give the Ethernet shield a second to initialize
   delay(1000);
   
-  Wire.begin(I2C_1);
-  Wire.begin(I2C_2);
-  Wire.begin(I2C_3);
-  Wire.begin(I2C_4);
-  Wire.begin(I2C_5);
-  Wire.begin(I2C_6);
-  
-  // Start the library, pass in the data details and the name of the serial port. 
-  // Can be Serial, Serial1, Serial2, etc. 
-  ET.begin(details(transferData), &Wire);
-
-  // Define handler function on receiving data
-  Wire.onReceive(checkTag); 
+  Wire.begin();  
 }
 
 /************************************************
@@ -163,7 +129,15 @@ void loop() {
     lastTime = time;
   }
   
-  delay(1000);
+  Wire.requestFrom(2, 20);
+  while (Wire.available()) { // slave may send less than requested
+    char c = Wire.read();    // receive a byte as character
+    Serial.print(c);         // print the character
+  }
+  Wire.beginTransmission(2); // transmit to device #9
+  Wire.send('Y'); // sends 'Y'
+  Wire.endTransmission(); // stop transmitting
+  delay(500);
 }
 
 /**
