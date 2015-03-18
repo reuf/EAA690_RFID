@@ -3,33 +3,37 @@
  * example code illustrating Time library set through serial port messages.
  *
  * Messages consist of the letter T followed by ten digit time (as seconds since Jan 1 1970)
- * you can send the text on the next line using Serial Monitor to set the clock to noon Jan 1 2010
- T1262347200  
+ * you can send the text on the next line using Serial Monitor to set the clock to noon Jan 1 2013
+ T1357041600  
  *
  * A Processing example sketch to automatically send the messages is inclided in the download
+ * On Linux, you can use "date +T%s\n > /dev/ttyACM0" (UTC time zone)
  */ 
  
 #include <Time.h>  
 
-#define TIME_MSG_LEN  11   // time sync to PC is HEADER followed by unix time_t as ten ascii digits
-#define TIME_HEADER  'T'   // Header tag for serial time sync message
+#define TIME_HEADER  "T"   // Header tag for serial time sync message
 #define TIME_REQUEST  7    // ASCII bell character requests a time sync message 
 
 void setup()  {
   Serial.begin(9600);
+  while (!Serial) ; // Needed for Leonardo only
+  pinMode(13, OUTPUT);
   setSyncProvider( requestSync);  //set function to call when sync required
   Serial.println("Waiting for sync message");
 }
 
 void loop(){    
-  if(Serial.available() ) 
-  {
+  if (Serial.available()) {
     processSyncMessage();
   }
-  if(timeStatus()!= timeNotSet)   
-  {
-    digitalWrite(13,timeStatus() == timeSet); // on if synced, off if needs refresh  
+  if (timeStatus()!= timeNotSet) {
     digitalClockDisplay();  
+  }
+  if (timeStatus() == timeSet) {
+    digitalWrite(13, HIGH); // LED on if synced
+  } else {
+    digitalWrite(13, LOW);  // LED off if needs refresh
   }
   delay(1000);
 }
@@ -56,27 +60,22 @@ void printDigits(int digits){
   Serial.print(digits);
 }
 
+
 void processSyncMessage() {
-  // if time sync available from serial port, update time and return true
-  while(Serial.available() >=  TIME_MSG_LEN ){  // time message consists of a header and ten ascii digits
-    char c = Serial.read() ; 
-    Serial.print(c);  
-    if( c == TIME_HEADER ) {       
-      time_t pctime = 0;
-      for(int i=0; i < TIME_MSG_LEN -1; i++){   
-        c = Serial.read();          
-        if( c >= '0' && c <= '9'){   
-          pctime = (10 * pctime) + (c - '0') ; // convert digits to a number    
-        }
-      }   
-      setTime(pctime);   // Sync Arduino clock to the time received on the serial port
-    }  
+  unsigned long pctime;
+  const unsigned long DEFAULT_TIME = 1357041600; // Jan 1 2013
+
+  if(Serial.find(TIME_HEADER)) {
+     pctime = Serial.parseInt();
+     if( pctime >= DEFAULT_TIME) { // check the integer is a valid time (greater than Jan 1 2013)
+       setTime(pctime); // Sync Arduino clock to the time received on the serial port
+     }
   }
 }
 
 time_t requestSync()
 {
-  Serial.print(TIME_REQUEST,BYTE);  
+  Serial.write(TIME_REQUEST);  
   return 0; // the time will be sent later in response to serial mesg
 }
 

@@ -20,8 +20,9 @@ void setup()  {
   setSyncProvider(RTC.get);   // the function to sync the time from the RTC  
   for(int i=0; i < nbrInputPins; i++){
      pinMode( inputPins[i], INPUT);
-     // digitalWrite( inputPins[i], HIGH);  // uncomment these lines if 
-     // state[i] = HIGH;                    // pull-up resistors are wanted
+     // uncomment these lines if pull-up resistors are wanted
+     // pinMode( inputPins[i], INPUT_PULLUP);
+     // state[i] = HIGH;
   }
 }
 
