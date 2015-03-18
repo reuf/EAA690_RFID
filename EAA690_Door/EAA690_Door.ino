@@ -87,6 +87,7 @@ void setup() {
   
   Wire.begin(I2C);
   Wire.onRequest(requestEvent); // register event
+  Wire.onReceive(receiveEvent); // register event
 
   Serial.begin(9600);  // set up Serial library at 9600 bps
   
@@ -116,36 +117,38 @@ void loop() {
   }
   
   //reset the RFID reader
-  //digitalWrite(RFIDResetPin, LOW);
-  //digitalWrite(RFIDResetPin, HIGH);
+  digitalWrite(RFIDResetPin, LOW);
+  digitalWrite(RFIDResetPin, HIGH);
     
   // A short delay...
   delay(150);
 }
 
+// Called by Main Controller to let us know if access is granted.
+void receiveEvent(int howMany) {
+  if (Wire.read() == 'Y') {
+    openDoor();
+  } else {
+    accessDenied();
+  }
+  tag = "";
+}
+
 // Called by Main Controller to see if a card has been read.
 void requestEvent() {
   if (tag != "") {
-    Wire.write(tag);
-    boolean responseReceived = false;
-    while (!responseReceived) {
-      if (Wire.available()) {
-        responseReceived = true;
-        char access = Wire.read(); // receive access response
-        if (access == 'Y') {
-          openDoor();
-        } else if (access == 'N') {
-          accessDenied();
-        }
-      } else {
-        // A short delay...
-        delay(150);
-      }
-    }
-    tag = "";
+    Wire.write(charArray(tag));
   } else {
     Wire.write("0");
   }
+}
+
+// Helper method to convert a String to a char array
+char* charArray(String str) {
+  int strLength = sizeof(str);
+  char strArray[strLength];
+  str.toCharArray(strArray, strLength);
+  return strArray;
 }
 
 /**

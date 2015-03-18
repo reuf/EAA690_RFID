@@ -68,7 +68,6 @@
 #include <Ethernet.h>
 #include <EthernetClient.h>
 #include <EthernetUdp.h>
-#include <util.h>
 
 /********************
  * GLOBAL VARIABLES *
@@ -129,14 +128,20 @@ void loop() {
     lastTime = time;
   }
   
-  Wire.requestFrom(2, 20);
-  while (Wire.available()) { // slave may send less than requested
-    char c = Wire.read();    // receive a byte as character
-    Serial.print(c);         // print the character
+  for (int i = 1; i < 9; i++) { // Up to 8 Door Controllers
+    char val = 0; // variable to store the data from the serial port
+    Wire.requestFrom(i, 20);
+    String tag = "";
+    while (Wire.available()) { // Door Controller may send less than requested
+      val = Wire.read();
+      tag = tag + val;
+    }
+    if (tag != "0") {
+      Wire.beginTransmission(i); // transmit to device
+      Wire.write(checkTag(i, tag)); // send access
+      Wire.endTransmission(); // stop transmitting
+    }
   }
-  Wire.beginTransmission(2); // transmit to device #9
-  Wire.send('Y'); // sends 'Y'
-  Wire.endTransmission(); // stop transmitting
   delay(500);
 }
 
@@ -170,31 +175,26 @@ void getUserData() {
 /**
  * Check the read tag against known tags
  */
-void checkTag(int numBytes) {
+char checkTag(int door, String tag) {
+  char access = 'N';
   EthernetUDP udp;
   unsigned long nowLong = ntpUnixTime(udp);
   
-  if (transferData.tag == "") {
-    transferData.accessGranted = false; //empty, no need to continue
-  } else if (transferData.tag == validcard) {
-    transferData.accessGranted = true; // Override this particular card
-  } else {
+  if (sizeof(tag) > 2) {
     // 1. Find the record in the database file (on the SD card)
     // 2. Look for the "Door ID" value
     // 3. If it is a "1", then access is granted
-    if (getValue(getRecord(transferData.tag), ',',  transferData.id + 1) == "1") {
-      transferData.accessGranted = true;
+    if (getValue(getRecord(tag), ',',  door + 1) == "1") {
+      access = 'Y';
     }
   }
   
-  // Send response back to door
-  ET.sendData(transferData.i2c);
-
   File logFile = SD.open("system.log", FILE_WRITE);
   if (logFile) {
-    logFile.println(nowLong + "," + transferData.tag + "," + "," + transferData.id + "," + transferData.accessGranted);
+    logFile.println(nowLong + "," + tag + "," + "," + door + "," + access);
     logFile.close();
   }
+  return access;
 }
 
 /**
