@@ -65,6 +65,7 @@
 #include <SPI.h>
 #include <Dhcp.h>
 #include <Dns.h>
+#include <EasyTransferI2C.h>
 #include <Ethernet.h>
 #include <EthernetClient.h>
 #include <EthernetUdp.h>
@@ -77,7 +78,7 @@ unsigned long lastTime = 0;
 // Arduino PINs
 int SS_MICROSD = 10;
 int RFIDResetPin = 8;
-int I2C = 9;
+int I2C = 0;
 
 // Time - NTP Servers:
 IPAddress timeServer(132, 163, 4, 101); // time-a.timefreq.bldrdoc.gov
@@ -111,6 +112,27 @@ SdFile root;
 // Sparkfun SD shield: pin 8
 const int chipSelect = 4;    
 
+EasyTransferI2C ET;
+
+struct DATA_STRUCTURE {
+  int access = 0;
+  int door = -1;
+  char char1;
+  char char2;
+  char char3;
+  char char4;
+  char char5;
+  char char6;
+  char char7;
+  char char8;
+  char char9;
+  char char10;
+  char char11;
+  char char12;
+};
+
+DATA_STRUCTURE tagData;
+
 /************************************************
  * Setup                                        *
  *                                              *
@@ -131,17 +153,18 @@ void setup() {
     //Ethernet.begin(mac, ip);
   }
   
-  Serial.println("Ethernet initialized.");
-  
   // Give the Ethernet shield a second to initialize
   delay(1000);
   
   Udp.begin(localPort);
   setSyncProvider(getNtpTime);
   
-  Wire.begin();
+  Wire.begin(0);
+  ET.begin(details(tagData), &Wire);
+  Wire.onReceive(receive);
 
-  getUserData();
+  Serial.println("Setup complete.");
+  //getUserData();
 }
 
 /************************************************
@@ -152,22 +175,30 @@ void setup() {
  * repeatedly until the arduino is powered off  *
  ************************************************/
 void loop() {
-  for (int i = 1; i < 9; i++) { // Up to 8 Door Controllers
-    char val = 0; // variable to store the data from the serial port
-    Wire.requestFrom(i, 20);
-    String tag = "";
-    while (Wire.available()) { // Door Controller may send less than requested
-      val = Wire.read();
-      tag = tag + val;
-    }
-    if (tag != "0") {
-      Wire.beginTransmission(i); // transmit to device
-      Wire.write(checkTag(i, tag)); // send access
-      Wire.endTransmission(); // stop transmitting
-    }
+  if (ET.receiveData()) {
+    Serial.print("Tag data [");
+    Serial.print(tagData.char1);
+    Serial.print(tagData.char2);
+    Serial.print(tagData.char3);
+    Serial.print(tagData.char4);
+    Serial.print(tagData.char5);
+    Serial.print(tagData.char6);
+    Serial.print(tagData.char7);
+    Serial.print(tagData.char8);
+    Serial.print(tagData.char9);
+    Serial.print(tagData.char10);
+    Serial.print(tagData.char11);
+    Serial.print(tagData.char12);
+    Serial.print("] found at door #");
+    Serial.println(tagData.door);
+    checkTag();
+    ET.sendData(tagData.door);
   }
-  delay(500);
+  delay(5000);
 }
+
+// Called by Door Controller to let us know a tag has been read
+void receive(int howMany) {}
 
 void initSD() {
   // On the Ethernet Shield, CS is pin 4. It's set as an output by default.
@@ -198,13 +229,11 @@ void initSD() {
  * on the SD card.
  */
 void getUserData() {
-  Serial.println("Acquiring user data...");
   String webData = connectAndRead();
-  Serial.println("webData=" + webData);
   if (webData != "") {
-    if (SD.remove("database.csv")) {
-      Serial.println("database.csv removed");
-    }
+    //if (SD.remove("database.csv")) {
+      //Serial.println("database.csv removed");
+    //}
     File dbFile = SD.open("database.csv", FILE_WRITE);
     if (dbFile) {
       dbFile.println(webData);
@@ -215,7 +244,6 @@ void getUserData() {
     }
     client.stop();
   }
-  Serial.println("user data acquired.");
 }
 
 String connectAndRead(){
@@ -269,17 +297,16 @@ String readPage(){
 /**
  * Check the read tag against known tags
  */
-char checkTag(int door, String tag) {
-  char access = 'N';
-  
-  if (sizeof(tag) > 2) {
+void checkTag() {
+  //if (sizeof(tag) > 2) {
     // 1. Find the record in the database file (on the SD card)
     // 2. Look for the "Door ID" value
     // 3. If it is a "1", then access is granted
-    if (getValue(getRecord(tag), ',',  door + 1) == "1") {
-      access = 'Y';
-    }
-  }
+    //if (getValue(getRecord(tag), ',',  door + 1) == "1") {
+    //if (tagData.tag == "710024FB329C") {
+      tagData.access = 1;
+    //}
+  //}
   
   //if (timeStatus() != timeNotSet) {
   //  if (now() != prevDisplay) { //update the display only if time has changed
@@ -289,11 +316,10 @@ char checkTag(int door, String tag) {
   
   File logFile = SD.open("system.log", FILE_WRITE);
   if (logFile) {
-    Serial.println(digitalClockDisplay() + "," + tag + "," + "," + door + "," + access);
-    logFile.println(digitalClockDisplay() + "," + tag + "," + "," + door + "," + access);
+    Serial.println(digitalClockDisplay() + "," + tagData.char1 + "," + "," + tagData.door + "," + tagData.access);
+    logFile.println(digitalClockDisplay() + "," + tagData.char1 + "," + "," + tagData.door + "," + tagData.access);
     logFile.close();
   }
-  return access;
 }
 
 /**
