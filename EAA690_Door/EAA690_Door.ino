@@ -57,7 +57,7 @@ int RED = 5;
 int GREEN = 6;
 int BLUE = 7;
 int RFIDResetPin = 8;
-int I2C = 9;
+int I2C = 1;
 
 // Color Modes
 int COLOR_MODE_RED = 1;

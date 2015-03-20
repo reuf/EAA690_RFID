@@ -1,0 +1,11 @@
+<?php
+header('Content-Description: File Transfer');
+header("Content-Type: application/csv") ;
+header("Content-Disposition: attachment; filename=database.csv");
+//header("Pragma: no-cache");
+header("Expires: 0");
+
+echo "RFID,Main Door,Kitchen Door,Tool Room,Simulator Room,Storage Room\n";
+echo "710024FB329C,1,1,1,1,1\n";
+echo "7100252B3748,0,0,0,0,0\n";
+?>

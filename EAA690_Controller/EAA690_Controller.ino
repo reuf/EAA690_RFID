@@ -75,7 +75,7 @@
 unsigned long lastTime = 0;
   
 // Arduino PINs
-int SS_MICROSD = 4;
+int SS_MICROSD = 10;
 int RFIDResetPin = 8;
 int I2C = 9;
 
@@ -93,12 +93,23 @@ const int NTP_PACKET_SIZE = 48; // NTP time is in the first 48 bytes of message
 byte packetBuffer[NTP_PACKET_SIZE]; //buffer to hold incoming & outgoing packets
 
 // Network
-byte mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };
+byte mac[] = { 0x90, 0xA2, 0xDA, 0x0D, 0xF1, 0xD1 };
 char server[] = "www.brianmichael.org";
-IPAddress ip(192,168,0,107);
+//IPAddress ip(192,168,0,107);
 EthernetClient client;
 EthernetUDP Udp;
 unsigned int localPort = 8888;  // local port to listen for UDP packets
+
+// set up variables using the SD utility library functions:
+Sd2Card card;
+SdVolume volume;
+SdFile root;
+
+// change this to match your SD shield or module;
+// Arduino Ethernet shield: pin 4
+// Adafruit SD shields and modules: pin 10
+// Sparkfun SD shield: pin 8
+const int chipSelect = 4;    
 
 /************************************************
  * Setup                                        *
@@ -108,17 +119,19 @@ unsigned int localPort = 8888;  // local port to listen for UDP packets
  * and initializes any variables and settings   *
  ************************************************/
 void setup() {
+  
   // Open serial communications and wait for port to open:
   Serial.begin(9600);   // Init the computer console
   
-  // Setup Arduino PINs
-  pinMode(SS_MICROSD, OUTPUT); // SD SS pin
+  initSD();
   
   // Start the Ethernet connection
   if (Ethernet.begin(mac) == 0) {
     // Try to configure using IP address instead of DHCP
-    Ethernet.begin(mac, ip);
-  } 
+    //Ethernet.begin(mac, ip);
+  }
+  
+  Serial.println("Ethernet initialized.");
   
   // Give the Ethernet shield a second to initialize
   delay(1000);
@@ -126,7 +139,9 @@ void setup() {
   Udp.begin(localPort);
   setSyncProvider(getNtpTime);
   
-  Wire.begin();  
+  Wire.begin();
+
+  getUserData();
 }
 
 /************************************************
@@ -137,12 +152,6 @@ void setup() {
  * repeatedly until the arduino is powered off  *
  ************************************************/
 void loop() {
-  if (timeStatus() != timeNotSet) {
-    if (now() != prevDisplay) { //update the display only if time has changed
-      prevDisplay = now();
-    }
-  }
-  
   for (int i = 1; i < 9; i++) { // Up to 8 Door Controllers
     char val = 0; // variable to store the data from the serial port
     Wire.requestFrom(i, 20);
@@ -160,30 +169,100 @@ void loop() {
   delay(500);
 }
 
+void initSD() {
+  // On the Ethernet Shield, CS is pin 4. It's set as an output by default.
+  // Note that even if it's not used as the CS pin, the hardware SS pin 
+  // (10 on most Arduino boards, 53 on the Mega) must be left as an output 
+  // or the SD library functions will not work. 
+  //pinMode(10, OUTPUT);     // change this to 53 on a mega
+  pinMode(SS_MICROSD, OUTPUT); // SD SS pin
+
+  // we'll use the initialization code from the utility libraries
+  // since we're just testing if the card is working!
+  if (!card.init(SPI_HALF_SPEED, chipSelect)) {
+    //Serial.println("initialization failed.");
+    return;
+  } else {
+   //Serial.println("Wiring is correct and a card is present."); 
+  }
+
+  // Now we will try to open the 'volume'/'partition' - it should be FAT16 or FAT32
+  if (!volume.init(card)) {
+    //Serial.println("Could not find FAT16/FAT32 partition.\nMake sure you've formatted the card");
+    return;
+  }
+}
+
 /**
  * Retrieve user database data (CSV) and store it 
  * on the SD card.
  */
 void getUserData() {
+  Serial.println("Acquiring user data...");
+  String webData = connectAndRead();
+  Serial.println("webData=" + webData);
+  if (webData != "") {
+    if (SD.remove("database.csv")) {
+      Serial.println("database.csv removed");
+    }
+    File dbFile = SD.open("database.csv", FILE_WRITE);
+    if (dbFile) {
+      dbFile.println(webData);
+      dbFile.flush();
+      dbFile.close();
+    } else {
+      Serial.println("dbFile was not opened");
+    }
+    client.stop();
+  }
+  Serial.println("user data acquired.");
+}
+
+String connectAndRead(){
+  //connect to the server
+  //port 80 is typical of a www page
   if (client.connect(server, 80)) {
-    SD.remove("database.csv");
-    // Make a HTTP request:
-    client.println("GET /csv.php HTTP/1.1");
+    //Serial.println("connected");
+    client.print("GET /csv.php");
+    client.println(" HTTP/1.1");
     String hostString = "Host: ";
     hostString.concat(server);
     client.println(hostString);
+    client.println("User-Agent: Arduino");
+    client.println("Accept: text/html");
     client.println("Connection: close");
     client.println();
-    // Get HTTP response
-    File dbFile = SD.open("database.csv", FILE_WRITE);
-    if (dbFile) {
-      while (client.available()) { 
-        char c = client.read();
-        dbFile.print(c);
+     
+    delay(500);
+    //Connected - Read the page
+    return readPage(); //go and read the output
+  } else {
+    return "";
+  }
+}
+
+String readPage(){
+  //read the page, and capture & return everything between '@' and '@'
+  String data = ""; // string for incoming serial data
+  boolean startRead = false; // is reading?
+  while (true) {
+    if (client.available()) {
+      char c = client.read();
+      if (c == '@' ) { //'@' is our begining character
+        startRead = true; //Ready to start reading the part 
+      } else if (startRead) {
+        if (c != '@') { //'@' is our ending character
+          data += c;
+        } else {
+          //got what we need here! We can disconnect now
+          startRead = false;
+          client.stop();
+          client.flush();
+          //Serial.println("disconnecting.");
+          return data;
+        }
       }
-      dbFile.close();
     }
-    client.stop();
   }
 }
 
@@ -192,7 +271,6 @@ void getUserData() {
  */
 char checkTag(int door, String tag) {
   char access = 'N';
-  EthernetUDP udp;
   
   if (sizeof(tag) > 2) {
     // 1. Find the record in the database file (on the SD card)
@@ -203,8 +281,15 @@ char checkTag(int door, String tag) {
     }
   }
   
+  //if (timeStatus() != timeNotSet) {
+  //  if (now() != prevDisplay) { //update the display only if time has changed
+  //    prevDisplay = now();
+  //  }
+  //}
+  
   File logFile = SD.open("system.log", FILE_WRITE);
   if (logFile) {
+    Serial.println(digitalClockDisplay() + "," + tag + "," + "," + door + "," + access);
     logFile.println(digitalClockDisplay() + "," + tag + "," + "," + door + "," + access);
     logFile.close();
   }
@@ -329,4 +414,3 @@ void sendNTPpacket(IPAddress &address)
   Udp.write(packetBuffer, NTP_PACKET_SIZE);
   Udp.endPacket();
 }
-

@@ -1,14 +1,10 @@
 <?php
-header('Content-Description: File Transfer');
-header("Content-Type: application/csv") ;
-header("Content-Disposition: attachment; filename=database.csv");
-//header("Pragma: no-cache");
-header("Expires: 0");
+//the arduino will store anything between '@' and '@'
+//So if the output was @1kjhghk5@ - the  arduino would read 1kjhghk5
 
-echo "554948485052706651505767,Brian,Michael,01 JAN 2015,hangar,Hello\n";
-echo "554948485052706651505768,Ben,Michael,01 JAN 2015,hangar,Hello\n";
-echo "554948485052706651505769,Kate,Michael,01 JAN 2015,hangar,Hello\n";
-echo "554948485052706651505770,Karen,Michael,01 JAN 2015,hangar,Hello\n";
-echo "554948485052706651505771,Bill,Michael,01 JAN 2015,hangar,Hello\n";
-echo "554948485052706651505772,Randy,Epstein,01 JAN 2015,hangar,Hello\n";
+echo "@";
+echo "RFID,Main Door,Kitchen Door,Tool Room,Simulator Room,Storage Room\n";
+echo "710024FB329C,1,1,1,1,1\n";
+echo "7100252B3748,0,0,0,0,0\n";
+echo "@";
 ?>
