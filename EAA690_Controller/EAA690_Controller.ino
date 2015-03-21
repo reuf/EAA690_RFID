@@ -177,24 +177,30 @@ void setup() {
 void loop() {
   if (ET.receiveData()) {
     Serial.print("Tag data [");
-    Serial.print(tagData.char1);
-    Serial.print(tagData.char2);
-    Serial.print(tagData.char3);
-    Serial.print(tagData.char4);
-    Serial.print(tagData.char5);
-    Serial.print(tagData.char6);
-    Serial.print(tagData.char7);
-    Serial.print(tagData.char8);
-    Serial.print(tagData.char9);
-    Serial.print(tagData.char10);
-    Serial.print(tagData.char11);
-    Serial.print(tagData.char12);
+    Serial.print(getTag());
     Serial.print("] found at door #");
     Serial.println(tagData.door);
     checkTag();
     ET.sendData(tagData.door);
   }
   delay(5000);
+}
+
+String getTag() {
+  String tag = "";
+  tag += tagData.char1;
+  tag += tagData.char2;
+  tag += tagData.char3;
+  tag += tagData.char4;
+  tag += tagData.char5;
+  tag += tagData.char6;
+  tag += tagData.char7;
+  tag += tagData.char8;
+  tag += tagData.char9;
+  tag += tagData.char10;
+  tag += tagData.char11;
+  tag += tagData.char12;
+  return tag;
 }
 
 // Called by Door Controller to let us know a tag has been read
@@ -303,9 +309,9 @@ void checkTag() {
     // 2. Look for the "Door ID" value
     // 3. If it is a "1", then access is granted
     //if (getValue(getRecord(tag), ',',  door + 1) == "1") {
-    //if (tagData.tag == "710024FB329C") {
+    if (getTag() == "710024FB3299") {
       tagData.access = 1;
-    //}
+    }
   //}
   
   //if (timeStatus() != timeNotSet) {
