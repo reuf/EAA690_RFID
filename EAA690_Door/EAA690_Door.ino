@@ -58,7 +58,7 @@ int RED = 5;
 int GREEN = 6;
 int BLUE = 7;
 int RFIDResetPin = 8;
-int I2C = 1;
+int I2C = 2;
 
 // Color Modes
 int COLOR_MODE_RED = 1;
@@ -160,8 +160,7 @@ void loop() {
     } else {
       accessDenied();
     }
-    tag = "";
-    tagData.access = 0;
+    clearTagData();
   }
 
   //reset the RFID reader
@@ -170,6 +169,23 @@ void loop() {
     
   // A short delay...
   delay(150);
+}
+
+void clearTagData() {
+    tag = "";
+    tagData.access = 0;
+    tagData.char1 = '\0';
+    tagData.char2 = '\0';
+    tagData.char3 = '\0';
+    tagData.char4 = '\0';
+    tagData.char5 = '\0';
+    tagData.char6 = '\0';
+    tagData.char7 = '\0';
+    tagData.char8 = '\0';
+    tagData.char9 = '\0';
+    tagData.char10 = '\0';
+    tagData.char11 = '\0';
+    tagData.char12 = '\0';
 }
 
 // Called by Main Controller to let us know if access is granted.
