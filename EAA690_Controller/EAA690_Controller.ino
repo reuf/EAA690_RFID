@@ -96,6 +96,7 @@ byte packetBuffer[NTP_PACKET_SIZE]; //buffer to hold incoming & outgoing packets
 // Network
 byte mac[] = { 0x90, 0xA2, 0xDA, 0x0D, 0xF1, 0xD1 };
 char server[] = "www.brianmichael.org";
+String dataLocation = "/csv.php HTTP/1.1";
 //IPAddress ip(192,168,0,107);
 EthernetClient client;
 EthernetUDP Udp;
@@ -149,6 +150,7 @@ void setup() {
   
   // Start the Ethernet connection
   if (Ethernet.begin(mac) == 0) {
+    Serial.println("Failed to configure Ethernet using DHCP");
     // Try to configure using IP address instead of DHCP
     //Ethernet.begin(mac, ip);
   }
@@ -164,7 +166,6 @@ void setup() {
   Wire.onReceive(receive);
 
   Serial.println("Setup complete.");
-  //getUserData();
 }
 
 /************************************************
@@ -175,6 +176,15 @@ void setup() {
  * repeatedly until the arduino is powered off  *
  ************************************************/
 void loop() {
+  //if (minute() == 12 && second() >= 0 && second() <= 10) {
+    //getUserData();
+  //} else {
+    //Serial.print("minute=");
+    //Serial.print(minute());
+    //Serial.print("; second=");
+    //Serial.println(second());
+  //}
+  
   if (ET.receiveData()) {
     Serial.print("Tag data [");
     Serial.print(getTag());
@@ -235,21 +245,48 @@ void initSD() {
  * on the SD card.
  */
 void getUserData() {
-  String webData = connectAndRead();
-  if (webData != "") {
+  Serial.println("Retrieving user data...");
+  if (client.connect(server, 80)) {
+    Serial.println("making HTTP request...");
+
+    // make HTTP GET request to dataLocation:
+    client.println("GET " + dataLocation);
+    client.println("Host: www.brianmichael.org");
+    client.println();
+
+    String currentLine = "";
+    while (client.available()) {
+      // read incoming bytes:
+      char inChar = client.read();
+ 
+      // add incoming byte to end of line:
+      currentLine += inChar;
+    }
+    Serial.print("currentLine=");
+    Serial.println(currentLine);
+  }
+  //String webData = connectAndRead();
+  //if (webData != "") {
+    //Serial.print("1 webData=[");
+    //Serial.print(webData);
+    //Serial.println("]");
     //if (SD.remove("database.csv")) {
       //Serial.println("database.csv removed");
     //}
-    File dbFile = SD.open("database.csv", FILE_WRITE);
-    if (dbFile) {
-      dbFile.println(webData);
-      dbFile.flush();
-      dbFile.close();
-    } else {
-      Serial.println("dbFile was not opened");
-    }
-    client.stop();
-  }
+    //File dbFile = SD.open("database.csv", FILE_WRITE);
+    //if (dbFile) {
+      //dbFile.println(webData);
+      //dbFile.flush();
+      //dbFile.close();
+    //} else {
+      //Serial.println("dbFile was not opened");
+    //}
+    //client.stop();
+  //} else {
+    //Serial.print("2 webData=[");
+    //Serial.print(webData);
+    //Serial.println("]");
+  //}
 }
 
 String connectAndRead(){
@@ -257,20 +294,30 @@ String connectAndRead(){
   //port 80 is typical of a www page
   if (client.connect(server, 80)) {
     //Serial.println("connected");
-    client.print("GET /csv.php");
-    client.println(" HTTP/1.1");
+    //client.print("GET /csv.php");
+    sendAndLogClient("GET /csv.php", false);
+    //client.println(" HTTP/1.1");
+    sendAndLogClient(" HTTP/1.1", true);
     String hostString = "Host: ";
     hostString.concat(server);
-    client.println(hostString);
-    client.println("User-Agent: Arduino");
-    client.println("Accept: text/html");
-    client.println("Connection: close");
-    client.println();
+    //client.println(hostString);
+    sendAndLogClient(hostString, true);
+    //client.println("User-Agent: Arduino");
+    sendAndLogClient("User-Agent: Arduino", true);
+    //client.println("Accept: text/html");
+    sendAndLogClient("Accept: text/html", true);
+    //client.println("Connection: close");
+    sendAndLogClient("Connection: close", true);
+    //client.println();
+    sendAndLogClient("", true);
      
+    Serial.println("Waiting 1/2 a second...");
     delay(500);
     //Connected - Read the page
     return readPage(); //go and read the output
   } else {
+    Serial.print("Unable to connect to ");
+    Serial.println(server);
     return "";
   }
 }
@@ -297,6 +344,16 @@ String readPage(){
         }
       }
     }
+  }
+}
+
+void sendAndLogClient(String msg, boolean newLine) {
+  if (newLine) {
+    Serial.println(msg);
+    client.println(msg);
+  } else {
+    Serial.print(msg);
+    client.print(msg);
   }
 }
 
@@ -374,6 +431,30 @@ String getValue(String data, char separator, int index) {
 
   return found>index ? data.substring(strIndex[0], strIndex[1]) : "";
 }
+
+/*
+File temp = SD.open("log.txt", FILE_READ);
+if(temp) {
+  client.println("HTTP/1.1 200 OK");
+  client.println("Content-Type: application/octet-stream");
+  client.println("Content-Disposition: attachment;");
+  client.print("Content-Length: ");
+  client.println(temp.size());
+
+  while(temp.available()) {
+    char a = temp.read();
+    client.print(a);
+  }
+
+  temp.close();
+}
+
+client.println("HTTP/1.1 200 OK");
+client.println("Content-Type: text/text");
+client.println("Content-Disposition: attachment; filename=\"test.txt\"");
+client.println("Connection: close");
+
+*/
 
 /*-------- NTP code ----------*/
 

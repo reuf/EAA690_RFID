@@ -52,13 +52,13 @@
 /********************
  * GLOBAL VARIABLES *
  ********************/
-int ID = 1;
+//int ID = 1;
 int LOCK = 2;
 int RED = 5;
 int GREEN = 6;
 int BLUE = 7;
 int RFIDResetPin = 8;
-int I2C = 2;
+int I2C = 2; // This is the Door #
 
 // Color Modes
 int COLOR_MODE_RED = 1;
@@ -149,7 +149,7 @@ void loop() {
     if (tag != "") {
       //tagData.tag.replace("\n", "");
       //tagData.tag = tagData.tag.substring(1, tagData.tag.length() - 1);
-      //Serial.println("Read tag " + tagData.tag);
+      Serial.println("Read tag " + tagData.tag);
       ET.sendData(0);
     }
   }
@@ -271,3 +271,4 @@ void setLEDMode(int mode) {
     digitalWrite(BLUE, LOW);
   }
 }
+
