@@ -146,7 +146,7 @@ void loop() {
       if (count == 9) tagData.char9 = val;
       if (count == 10) tagData.char10 = val;
       if (count == 11) tagData.char11 = val;
-      if (count == 11) tagData.char12 = val;
+      if (count == 12) tagData.char12 = val;
       if (count > 0) tag += val;
       count++;
     }
