@@ -126,7 +126,7 @@ void setup() {
 
   // See if the card is present and can be initialized:
   if (!SD.begin(4)) {
-    Serial.println("Card failed, or not present");
+    Serial.println(F("Card failed, or not present"));
     // don't do anything more:
     return;
   }
@@ -134,7 +134,7 @@ void setup() {
   // Start the Ethernet connection
   byte mac[] = { 0x90, 0xA2, 0xDA, 0x0D, 0xF1, 0xD1 };
   if (Ethernet.begin(mac) == 0) {
-    Serial.println("Failed to configure Ethernet using DHCP");
+    Serial.println(F("Failed to configure Ethernet using DHCP"));
     // Try to configure using IP address instead of DHCP
     //Ethernet.begin(mac, ip);
   } else {
@@ -154,7 +154,7 @@ void setup() {
   ET.begin(details(tagData), &Wire);
   Wire.onReceive(receive);
 
-  Serial.println("Controller setup complete.");
+  Serial.println(F("Controller setup complete."));
 }
 
 /************************************************
@@ -217,9 +217,9 @@ void getUserData() {
   char server[] = "www.brianmichael.org";
   if (client.connect(server, 80)) {
     // Make a HTTP request:
-    client.println("GET /database.csv HTTP/1.1");
-    client.println("Host: www.brianmichael.org"); // This has to be defined this way :(
-    client.println("Connection: close");
+    client.println(F("GET /database.csv HTTP/1.1"));
+    client.println(F("Host: www.brianmichael.org")); // This has to be defined this way :(
+    client.println(F("Connection: close"));
     client.println();
     if (SD.exists("database.csv")) {
       if (SD.remove("database.csv")) {
@@ -273,10 +273,10 @@ void postUsageData() {
       if (c == '\n') { // We've reached the end of the line, send it
         char server[] = "www.brianmichael.org";
         if (client.connect(server, 80)) {
-          client.println("POST /addUsage.php HTTP/1.1");
-          client.println("HOST: www.brianmichael.org"); // This has to be defined this way :(
-          client.println("Content-Type: application/x-www-form-urlencoded");
-          client.print("Content-Length: ");
+          client.println(F("POST /addUsage.php HTTP/1.1"));
+          client.println(F("HOST: www.brianmichael.org")); // This has to be defined this way :(
+          client.println(F("Content-Type: application/x-www-form-urlencoded"));
+          client.print(F("Content-Length: "));
           client.println(line.length());
           client.println();
           //Serial.print("Sending [");
@@ -311,7 +311,7 @@ void checkTag() {
     // 3. If it is a "1", then access is granted
   if (getValue(getRecord(getTag()), ',',  tagData.door + 1) == "1") {
     tagData.access = 1;
-  } else if (getTag() == "710024FB3299") { // Master card
+  } else if (getTag() == "710024FB329C") { // Master card
     tagData.access = 1;
   } else {
     tagData.access = 0;
