@@ -380,15 +380,15 @@ String getValue(String data, char separator, int index) {
 String digitalClockDisplay() {
   String timeStr = "";
   // digital clock display of the time
+  timeStr += year(); 
+  timeStr += "-";
+  timeStr += month();
+  timeStr += "-";
+  timeStr += day();
+  timeStr += " ";
   timeStr += hour();
   timeStr += printDigits(minute());
   timeStr += printDigits(second());
-  timeStr += " ";
-  timeStr += day();
-  timeStr += " ";
-  timeStr += month();
-  timeStr += " ";
-  timeStr += year(); 
   return timeStr;
 }
 
