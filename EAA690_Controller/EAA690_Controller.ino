@@ -265,8 +265,8 @@ void checkTag() {
     // 1. Find the record in the database file (on the SD card)
     // 2. Look for the "Door ID" value
     // 3. If it is a "1", then access is granted
-  if (getValue(getRecord(getTag()), ',',  tagData.door + 1) == "1") {
-  //if (getTag() == "710024FB3299") {
+  //if (getValue(getRecord(getTag()), ',',  tagData.door + 1) == "1") {
+  if (getTag() == "710024FB3299") {
     tagData.access = 1;
   }
   
