@@ -119,12 +119,22 @@ void setup() {
   // Open serial communications and wait for port to open:
   Serial.begin(9600);   // Init the computer console
   
-  initSD();
+  // Initialize the SD card
+  // make sure that the default chip select pin is set to
+  // output, even if you don't use it:
+  pinMode(10, OUTPUT);
+
+  // See if the card is present and can be initialized:
+  if (!SD.begin(4)) {
+    Serial.println(F("Card failed, or not present"));
+    // don't do anything more:
+    return;
+  }
   
   // Start the Ethernet connection
   byte mac[] = { 0x90, 0xA2, 0xDA, 0x0D, 0xF1, 0xD1 };
   if (Ethernet.begin(mac) == 0) {
-    Serial.println("Failed to configure Ethernet using DHCP");
+    Serial.println(F("Failed to configure Ethernet using DHCP"));
     // Try to configure using IP address instead of DHCP
     //Ethernet.begin(mac, ip);
   } else {
@@ -144,7 +154,7 @@ void setup() {
   ET.begin(details(tagData), &Wire);
   Wire.onReceive(receive);
 
-  Serial.println("Controller setup complete.");
+  Serial.println(F("Controller setup complete."));
 }
 
 /************************************************
@@ -156,21 +166,29 @@ void setup() {
  ************************************************/
 void loop() {
   if (networkEnabled) {
+    // Retrieve the user access database every hour
     if (minute() == 0 && second() >= 0 && second() <= 2) {
       getUserData();
     }
+    // Post usage data to the server every 6 hours
+    if ((hour() == 0 || hour() == 6 || hour() == 12 || hour() == 18) && 
+        minute() == 0 && second() >= 0 && second() <= 2) {
+      postUsageData();
+    }
   }
   
+  // Handle door activity
   if (ET.receiveData()) {
-    Serial.print("Tag data [");
-    Serial.print(getTag());
-    Serial.print("] found at door #");
-    Serial.println(tagData.door);
+    //Serial.print("Tag data [");
+    //Serial.print(getTag());
+    //Serial.print("] found at door #");
+    //Serial.println(tagData.door);
     checkTag();
     ET.sendData(tagData.door);
   }
 }
 
+// Convenience method to retrieve the tag as a string
 String getTag() {
   String tag = "";
   tag += tagData.char1;
@@ -191,19 +209,6 @@ String getTag() {
 // Called by Door Controller to let us know a tag has been read
 void receive(int howMany) {}
 
-void initSD() {
-  // make sure that the default chip select pin is set to
-  // output, even if you don't use it:
-  pinMode(10, OUTPUT);
-
-  // see if the card is present and can be initialized:
-  if (!SD.begin(4)) {
-    Serial.println("Card failed, or not present");
-    // don't do anything more:
-    return;
-  }
-}
-
 /**
  * Retrieve user database data (CSV) and store it 
  * on the SD card.
@@ -212,16 +217,16 @@ void getUserData() {
   char server[] = "www.brianmichael.org";
   if (client.connect(server, 80)) {
     // Make a HTTP request:
-    client.println("GET /database.txt HTTP/1.1");
-    client.println("Host: www.brianmichael.org"); // This has to be defined this way :(
-    client.println("Connection: close");
+    client.println(F("GET /database.csv HTTP/1.1"));
+    client.println(F("Host: www.brianmichael.org")); // This has to be defined this way :(
+    client.println(F("Connection: close"));
     client.println();
-    if (SD.exists("database.txt")) {
-      if (SD.remove("database.txt")) {
-        Serial.println("database.txt removed");
+    if (SD.exists("database.csv")) {
+      if (SD.remove("database.csv")) {
+        //Serial.println("database.csv removed");
       }
     }
-    File dbFile = SD.open("database.txt", FILE_WRITE);
+    File dbFile = SD.open("database.csv", FILE_WRITE);
     // Give the buffer a chance to get some data
     delay(2000);
     boolean returnAndLF = false;
@@ -230,11 +235,12 @@ void getUserData() {
     while (client.available()) {
       char c = client.read();
       if (atFile) {
-        Serial.print(c);
+        //Serial.print(c);
         if (dbFile) {
           dbFile.print(c);
         }
-      // Do some spiffy detection logic to figure out where the header stops and the actual file starts
+      // Do some spiffy detection logic to figure out where 
+      // the header stops and the actual file starts
       } else if (c == '\n' && prevCharIsReturn && returnAndLF) {
         atFile = true;
       } else if (c == '\n' && prevCharIsReturn) {
@@ -257,6 +263,44 @@ void getUserData() {
   }
 }
 
+void postUsageData() {
+  // Send data to server
+  if (SD.exists("system.log")) { // Only send usage if it exists
+    File logFile = SD.open("system.log");
+    String line = ""; // = "Timestamp,tag,door,access;
+    while (logFile.available()) {
+      char c = logFile.read();
+      if (c == '\n') { // We've reached the end of the line, send it
+        char server[] = "www.brianmichael.org";
+        if (client.connect(server, 80)) {
+          client.println(F("POST /addUsage.php HTTP/1.1"));
+          client.println(F("HOST: www.brianmichael.org")); // This has to be defined this way :(
+          client.println(F("Content-Type: application/x-www-form-urlencoded"));
+          client.print(F("Content-Length: "));
+          client.println(line.length());
+          client.println();
+          //Serial.print("Sending [");
+          //Serial.print(line);
+          //Serial.println("] to server");
+          client.print(line);
+        }
+        if (client.connected()) {
+          client.stop();
+        }
+        line = ""; // Clear the line buffer for the next line
+      } else {
+        line += c; // We have not yet reached the end of the line.  
+                   // Add the char to the buffer and continue reading.
+      }
+    }
+    logFile.close();
+  }  
+  // Clear usage data from SD card
+  if (SD.remove("system.log")) {
+    //Serial.println("system.log removed");
+  }
+}
+
 /**
  * Check the read tag against known tags
  */
@@ -265,15 +309,18 @@ void checkTag() {
     // 1. Find the record in the database file (on the SD card)
     // 2. Look for the "Door ID" value
     // 3. If it is a "1", then access is granted
-  //if (getValue(getRecord(getTag()), ',',  tagData.door + 1) == "1") {
-  if (getTag() == "710024FB3299") {
+  if (getValue(getRecord(getTag()), ',',  tagData.door + 1) == "1") {
     tagData.access = 1;
+  } else if (getTag() == "710024FB329C") { // Master card
+    tagData.access = 1;
+  } else {
+    tagData.access = 0;
   }
   
   File logFile = SD.open("system.log", FILE_WRITE);
   if (logFile) {
-    Serial.println(digitalClockDisplay() + "," + tagData.char1 + "," + "," + tagData.door + "," + tagData.access);
-    logFile.println(digitalClockDisplay() + "," + tagData.char1 + "," + "," + tagData.door + "," + tagData.access);
+    //Serial.println(digitalClockDisplay() + "," + getTag() + "," + tagData.door + "," + tagData.access);
+    logFile.println(digitalClockDisplay() + "," + getTag() + "," + tagData.door + "," + tagData.access);
     logFile.flush();
     logFile.close();
   }
@@ -284,8 +331,8 @@ void checkTag() {
  */
 String getRecord(String tag) {
   String returnLine;
-  if (SD.exists("database.txt")) {
-    File dbFile = SD.open("database.txt");
+  if (SD.exists("database.csv")) {
+    File dbFile = SD.open("database.csv");
     String line = ""; // = "554948485052706651505767,1,0,0,0,0,0";
     int i = 0;
     while (dbFile.available()) {
@@ -303,8 +350,8 @@ String getRecord(String tag) {
     }
     dbFile.close();
   }
-  Serial.print("getRecord() returning: ");
-  Serial.println(returnLine);
+  //Serial.print("getRecord() returning: ");
+  //Serial.println(returnLine);
   return returnLine;
 }
 
@@ -333,15 +380,15 @@ String getValue(String data, char separator, int index) {
 String digitalClockDisplay() {
   String timeStr = "";
   // digital clock display of the time
+  timeStr += year(); 
+  timeStr += "-";
+  timeStr += month();
+  timeStr += "-";
+  timeStr += day();
+  timeStr += " ";
   timeStr += hour();
   timeStr += printDigits(minute());
   timeStr += printDigits(second());
-  timeStr += " ";
-  timeStr += day();
-  timeStr += " ";
-  timeStr += month();
-  timeStr += " ";
-  timeStr += year(); 
   return timeStr;
 }
 
