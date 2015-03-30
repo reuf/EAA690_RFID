@@ -172,7 +172,7 @@ void loop() {
     }
     // Post usage data to the server every 6 hours
     if ((hour() == 0 || hour() == 6 || hour() == 12 || hour() == 18) && 
-        minute() == 0 && second() >= 0 && second() <= 2) {
+        minute() == 2 && second() >= 0 && second() <= 2) {
       postUsageData();
     }
   }
