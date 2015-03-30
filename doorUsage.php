@@ -12,20 +12,21 @@
       <title>Door Usage Data</title>
    </head>
 <body>
-   <h1>Temperature / moisture sensor readings</h1>
+   <h1>Access</h1>
 
    <table border="1" cellspacing="1" cellpadding="1">
 		<tr>
-			<td>&nbsp;Timestamp&nbsp;</td>
-			<td>&nbsp;Temperature 1&nbsp;</td>
-			<td>&nbsp;Moisture 1&nbsp;</td>
+			<td>Timestamp</td>
+			<td>Tag</td>
+			<td>Door</td>
+			<td>Access</td>
 		</tr>
 
       <?php 
 		  if($result!==FALSE){
 		     while($row = mysql_fetch_array($result)) {
-		        printf("<tr><td> &nbsp;%s </td><td> &nbsp;%s&nbsp; </td><td> &nbsp;%s&nbsp; </td></tr>", 
-		           $row["timeStamp"], $row["temperature"], $row["humidity"]);
+		        printf("<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>", 
+		           $row["time"], $row["tag"], $row["door"], $row["access"]);
 		     }
 		     mysql_free_result($result);
 		     mysql_close();
