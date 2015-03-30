@@ -58,7 +58,7 @@ int RED = 5;
 int GREEN = 6;
 int BLUE = 7;
 int RFIDResetPin = 8;
-int I2C = 2; // This is the Door #
+int I2C = 1; // This is the Door #
 
 // Color Modes
 int COLOR_MODE_RED = 1;
@@ -113,7 +113,11 @@ void setup() {
 
   Serial.begin(9600);  // set up Serial library at 9600 bps
   
-  setLEDMode(COLOR_MODE_OFF);
+  //setLEDMode(COLOR_MODE_OFF);
+  setLEDMode(COLOR_MODE_BLUE);
+  Serial.print("Door #");
+  Serial.print(I2C);
+  Serial.println(" started!");
 }
 
 /************************************************
@@ -149,7 +153,7 @@ void loop() {
     if (tag != "") {
       //tagData.tag.replace("\n", "");
       //tagData.tag = tagData.tag.substring(1, tagData.tag.length() - 1);
-      Serial.println("Read tag " + tagData.tag);
+      Serial.println("Read tag " + tag);
       ET.sendData(0);
     }
   }
@@ -197,7 +201,8 @@ void receive(int howMany) {}
 void accessDenied() {
   setLEDMode(COLOR_MODE_RED);
   delay(5000);
-  setLEDMode(COLOR_MODE_OFF);
+  //setLEDMode(COLOR_MODE_OFF);
+  setLEDMode(COLOR_MODE_BLUE);
 }
 
 /**
@@ -208,7 +213,8 @@ void openDoor() {
   digitalWrite(LOCK, HIGH);
   delay(10000);
   digitalWrite(LOCK, LOW);
-  setLEDMode(COLOR_MODE_OFF);
+  //setLEDMode(COLOR_MODE_OFF);
+  setLEDMode(COLOR_MODE_BLUE);
 }
 
 /**

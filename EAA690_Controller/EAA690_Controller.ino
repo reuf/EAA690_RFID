@@ -48,9 +48,9 @@
                                     | | Arduino MINI | |
          ||||  [Main Controller]    | +--------------+ |
    +----------------------+         | +------+         |
-   |   | RJ45 |  +------+ |         | | RFID |         |
-   |   +------+  | RFID | |         | +------+         |
-   |    LM7805   +------+ |         | +--------------+ |
+   |   | RJ45 |           |         | | RFID |         |
+   |   +------+           |         | +------+         |
+   |    LM7805            |         | +--------------+ |
    | +-------------+----+ |         | | Raspberry Pi | |
    | | Arduino UNO | SD | |         | +--------------+ |
    | +-------------+----+ |         +------------------+
@@ -73,45 +73,18 @@
 /********************
  * GLOBAL VARIABLES *
  ********************/
-unsigned long lastTime = 0;
-  
-// Arduino PINs
-int SS_MICROSD = 10;
-int RFIDResetPin = 8;
-int I2C = 0;
-
 // Time - NTP Servers:
 IPAddress timeServer(132, 163, 4, 101); // time-a.timefreq.bldrdoc.gov
 // IPAddress timeServer(132, 163, 4, 102); // time-b.timefreq.bldrdoc.gov
 // IPAddress timeServer(132, 163, 4, 103); // time-c.timefreq.bldrdoc.gov
-//const int timeZone = 1;     // Central European Time
 const int timeZone = -5;  // Eastern Standard Time (USA)
-//const int timeZone = -4;  // Eastern Daylight Time (USA)
-//const int timeZone = -8;  // Pacific Standard Time (USA)
-//const int timeZone = -7;  // Pacific Daylight Time (USA)
-time_t prevDisplay = 0; // when the digital clock was displayed
 const int NTP_PACKET_SIZE = 48; // NTP time is in the first 48 bytes of message
 byte packetBuffer[NTP_PACKET_SIZE]; //buffer to hold incoming & outgoing packets
 
 // Network
-byte mac[] = { 0x90, 0xA2, 0xDA, 0x0D, 0xF1, 0xD1 };
-char server[] = "www.brianmichael.org";
-String dataLocation = "/csv.php HTTP/1.1";
-//IPAddress ip(192,168,0,107);
 EthernetClient client;
 EthernetUDP Udp;
-unsigned int localPort = 8888;  // local port to listen for UDP packets
-
-// set up variables using the SD utility library functions:
-Sd2Card card;
-SdVolume volume;
-SdFile root;
-
-// change this to match your SD shield or module;
-// Arduino Ethernet shield: pin 4
-// Adafruit SD shields and modules: pin 10
-// Sparkfun SD shield: pin 8
-const int chipSelect = 4;    
+boolean networkEnabled = false;
 
 EasyTransferI2C ET;
 
@@ -149,23 +122,29 @@ void setup() {
   initSD();
   
   // Start the Ethernet connection
+  byte mac[] = { 0x90, 0xA2, 0xDA, 0x0D, 0xF1, 0xD1 };
   if (Ethernet.begin(mac) == 0) {
     Serial.println("Failed to configure Ethernet using DHCP");
     // Try to configure using IP address instead of DHCP
     //Ethernet.begin(mac, ip);
+  } else {
+    networkEnabled = true;
   }
   
   // Give the Ethernet shield a second to initialize
   delay(1000);
   
-  Udp.begin(localPort);
-  setSyncProvider(getNtpTime);
+  if (networkEnabled) {
+    unsigned int localPort = 8888;  // local port to listen for UDP packets
+    Udp.begin(localPort);
+    setSyncProvider(getNtpTime);
+  }
   
   Wire.begin(0);
   ET.begin(details(tagData), &Wire);
   Wire.onReceive(receive);
 
-  Serial.println("Setup complete.");
+  Serial.println("Controller setup complete.");
 }
 
 /************************************************
@@ -176,14 +155,11 @@ void setup() {
  * repeatedly until the arduino is powered off  *
  ************************************************/
 void loop() {
-  //if (minute() == 12 && second() >= 0 && second() <= 10) {
-    //getUserData();
-  //} else {
-    //Serial.print("minute=");
-    //Serial.print(minute());
-    //Serial.print("; second=");
-    //Serial.println(second());
-  //}
+  if (networkEnabled) {
+    if (minute() == 0 && second() >= 0 && second() <= 2) {
+      getUserData();
+    }
+  }
   
   if (ET.receiveData()) {
     Serial.print("Tag data [");
@@ -193,7 +169,6 @@ void loop() {
     checkTag();
     ET.sendData(tagData.door);
   }
-  delay(5000);
 }
 
 String getTag() {
@@ -217,25 +192,14 @@ String getTag() {
 void receive(int howMany) {}
 
 void initSD() {
-  // On the Ethernet Shield, CS is pin 4. It's set as an output by default.
-  // Note that even if it's not used as the CS pin, the hardware SS pin 
-  // (10 on most Arduino boards, 53 on the Mega) must be left as an output 
-  // or the SD library functions will not work. 
-  //pinMode(10, OUTPUT);     // change this to 53 on a mega
-  pinMode(SS_MICROSD, OUTPUT); // SD SS pin
+  // make sure that the default chip select pin is set to
+  // output, even if you don't use it:
+  pinMode(10, OUTPUT);
 
-  // we'll use the initialization code from the utility libraries
-  // since we're just testing if the card is working!
-  if (!card.init(SPI_HALF_SPEED, chipSelect)) {
-    //Serial.println("initialization failed.");
-    return;
-  } else {
-   //Serial.println("Wiring is correct and a card is present."); 
-  }
-
-  // Now we will try to open the 'volume'/'partition' - it should be FAT16 or FAT32
-  if (!volume.init(card)) {
-    //Serial.println("Could not find FAT16/FAT32 partition.\nMake sure you've formatted the card");
+  // see if the card is present and can be initialized:
+  if (!SD.begin(4)) {
+    Serial.println("Card failed, or not present");
+    // don't do anything more:
     return;
   }
 }
@@ -245,115 +209,51 @@ void initSD() {
  * on the SD card.
  */
 void getUserData() {
-  Serial.println("Retrieving user data...");
+  char server[] = "www.brianmichael.org";
   if (client.connect(server, 80)) {
-    Serial.println("making HTTP request...");
-
-    // make HTTP GET request to dataLocation:
-    client.println("GET " + dataLocation);
-    client.println("Host: www.brianmichael.org");
+    // Make a HTTP request:
+    client.println("GET /database.txt HTTP/1.1");
+    client.println("Host: www.brianmichael.org"); // This has to be defined this way :(
+    client.println("Connection: close");
     client.println();
-
-    String currentLine = "";
-    while (client.available()) {
-      // read incoming bytes:
-      char inChar = client.read();
- 
-      // add incoming byte to end of line:
-      currentLine += inChar;
-    }
-    Serial.print("currentLine=");
-    Serial.println(currentLine);
-  }
-  //String webData = connectAndRead();
-  //if (webData != "") {
-    //Serial.print("1 webData=[");
-    //Serial.print(webData);
-    //Serial.println("]");
-    //if (SD.remove("database.csv")) {
-      //Serial.println("database.csv removed");
-    //}
-    //File dbFile = SD.open("database.csv", FILE_WRITE);
-    //if (dbFile) {
-      //dbFile.println(webData);
-      //dbFile.flush();
-      //dbFile.close();
-    //} else {
-      //Serial.println("dbFile was not opened");
-    //}
-    //client.stop();
-  //} else {
-    //Serial.print("2 webData=[");
-    //Serial.print(webData);
-    //Serial.println("]");
-  //}
-}
-
-String connectAndRead(){
-  //connect to the server
-  //port 80 is typical of a www page
-  if (client.connect(server, 80)) {
-    //Serial.println("connected");
-    //client.print("GET /csv.php");
-    sendAndLogClient("GET /csv.php", false);
-    //client.println(" HTTP/1.1");
-    sendAndLogClient(" HTTP/1.1", true);
-    String hostString = "Host: ";
-    hostString.concat(server);
-    //client.println(hostString);
-    sendAndLogClient(hostString, true);
-    //client.println("User-Agent: Arduino");
-    sendAndLogClient("User-Agent: Arduino", true);
-    //client.println("Accept: text/html");
-    sendAndLogClient("Accept: text/html", true);
-    //client.println("Connection: close");
-    sendAndLogClient("Connection: close", true);
-    //client.println();
-    sendAndLogClient("", true);
-     
-    Serial.println("Waiting 1/2 a second...");
-    delay(500);
-    //Connected - Read the page
-    return readPage(); //go and read the output
-  } else {
-    Serial.print("Unable to connect to ");
-    Serial.println(server);
-    return "";
-  }
-}
-
-String readPage(){
-  //read the page, and capture & return everything between '@' and '@'
-  String data = ""; // string for incoming serial data
-  boolean startRead = false; // is reading?
-  while (true) {
-    if (client.available()) {
-      char c = client.read();
-      if (c == '@' ) { //'@' is our begining character
-        startRead = true; //Ready to start reading the part 
-      } else if (startRead) {
-        if (c != '@') { //'@' is our ending character
-          data += c;
-        } else {
-          //got what we need here! We can disconnect now
-          startRead = false;
-          client.stop();
-          client.flush();
-          //Serial.println("disconnecting.");
-          return data;
-        }
+    if (SD.exists("database.txt")) {
+      if (SD.remove("database.txt")) {
+        Serial.println("database.txt removed");
       }
     }
-  }
-}
-
-void sendAndLogClient(String msg, boolean newLine) {
-  if (newLine) {
-    Serial.println(msg);
-    client.println(msg);
-  } else {
-    Serial.print(msg);
-    client.print(msg);
+    File dbFile = SD.open("database.txt", FILE_WRITE);
+    // Give the buffer a chance to get some data
+    delay(2000);
+    boolean returnAndLF = false;
+    boolean prevCharIsReturn = false;
+    boolean atFile = false;
+    while (client.available()) {
+      char c = client.read();
+      if (atFile) {
+        Serial.print(c);
+        if (dbFile) {
+          dbFile.print(c);
+        }
+      // Do some spiffy detection logic to figure out where the header stops and the actual file starts
+      } else if (c == '\n' && prevCharIsReturn && returnAndLF) {
+        atFile = true;
+      } else if (c == '\n' && prevCharIsReturn) {
+        returnAndLF = true;
+      } else if (c == '\r') {
+        prevCharIsReturn = true;
+      } else {
+        prevCharIsReturn = false;
+        returnAndLF = false;
+      }
+    }
+    // if the server's disconnected, stop the client:
+    if (!client.connected()) {
+      if (dbFile) {
+        dbFile.flush();
+        dbFile.close();
+      }
+      client.stop();
+    }
   }
 }
 
@@ -365,22 +265,16 @@ void checkTag() {
     // 1. Find the record in the database file (on the SD card)
     // 2. Look for the "Door ID" value
     // 3. If it is a "1", then access is granted
-    //if (getValue(getRecord(tag), ',',  door + 1) == "1") {
-    if (getTag() == "710024FB3299") {
-      tagData.access = 1;
-    }
-  //}
-  
-  //if (timeStatus() != timeNotSet) {
-  //  if (now() != prevDisplay) { //update the display only if time has changed
-  //    prevDisplay = now();
-  //  }
-  //}
+  if (getValue(getRecord(getTag()), ',',  tagData.door + 1) == "1") {
+  //if (getTag() == "710024FB3299") {
+    tagData.access = 1;
+  }
   
   File logFile = SD.open("system.log", FILE_WRITE);
   if (logFile) {
     Serial.println(digitalClockDisplay() + "," + tagData.char1 + "," + "," + tagData.door + "," + tagData.access);
     logFile.println(digitalClockDisplay() + "," + tagData.char1 + "," + "," + tagData.door + "," + tagData.access);
+    logFile.flush();
     logFile.close();
   }
 }
@@ -390,14 +284,14 @@ void checkTag() {
  */
 String getRecord(String tag) {
   String returnLine;
-  if (SD.exists("database.csv")) {
-    File dbFile = SD.open("database.csv");
+  if (SD.exists("database.txt")) {
+    File dbFile = SD.open("database.txt");
     String line = ""; // = "554948485052706651505767,1,0,0,0,0,0";
     int i = 0;
     while (dbFile.available()) {
       char c = dbFile.read();
       if (c == '\n') {
-        String id = getValue(line, ',',  0);
+        String id = getValue(line, ',', 0);
         if (id == tag) {
           returnLine = line;
           break;
@@ -409,6 +303,8 @@ String getRecord(String tag) {
     }
     dbFile.close();
   }
+  Serial.print("getRecord() returning: ");
+  Serial.println(returnLine);
   return returnLine;
 }
 
@@ -431,30 +327,6 @@ String getValue(String data, char separator, int index) {
 
   return found>index ? data.substring(strIndex[0], strIndex[1]) : "";
 }
-
-/*
-File temp = SD.open("log.txt", FILE_READ);
-if(temp) {
-  client.println("HTTP/1.1 200 OK");
-  client.println("Content-Type: application/octet-stream");
-  client.println("Content-Disposition: attachment;");
-  client.print("Content-Length: ");
-  client.println(temp.size());
-
-  while(temp.available()) {
-    char a = temp.read();
-    client.print(a);
-  }
-
-  temp.close();
-}
-
-client.println("HTTP/1.1 200 OK");
-client.println("Content-Type: text/text");
-client.println("Content-Disposition: attachment; filename=\"test.txt\"");
-client.println("Connection: close");
-
-*/
 
 /*-------- NTP code ----------*/
 
