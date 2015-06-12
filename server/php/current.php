@@ -25,8 +25,8 @@
       <?php 
 		  if($result!==FALSE){
 		     while($row = mysql_fetch_array($result)) {
-		        printf("<tr><td id='id'>%s</td><td id='tag'>%s</td><td id='first'>%s</td><td id='last'>%s</td><td id='main'>%s</td><td id='kitchen'>%s</td><td id='tool'>%s</td><td id='simulator'>%s</td><td id='storage'>%s</td></tr>", 
-		           $row["id"], $row["tag"], $row["first_name"], $row["last_name"], $row["main"], $row["kitchen"], $row["tool_room"], $row["simulator"], $row["storage"]);
+		        printf("<tr id='%s'><td id='id'>%s</td><td id='tag'>%s</td><td id='first'>%s</td><td id='last'>%s</td><td id='main'>%s</td><td id='kitchen'>%s</td><td id='tool'>%s</td><td id='simulator'>%s</td><td id='storage'>%s</td></tr>", 
+		           $row["id"], $row["id"], $row["tag"], $row["first_name"], $row["last_name"], $row["main"], $row["kitchen"], $row["tool_room"], $row["simulator"], $row["storage"]);
 		     }
 		     mysql_free_result($result);
 		     mysql_close();
