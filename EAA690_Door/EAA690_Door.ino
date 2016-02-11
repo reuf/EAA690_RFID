@@ -9,6 +9,8 @@
    
  Simple schematic of overall system.  This sketch is for the "[Door Controller]" portion of the diagram.
  
+ BRIAN!!
+ 
             ^  ^
            +|  |- 
    +----------------+
